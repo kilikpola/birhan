@@ -1,9 +1,10 @@
 import NetInfo from '@react-native-community/netinfo';
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from './supabase';
+import { apiFetch, ApiError, OfflineError } from './api';
 import { useAuth } from './auth';
 import { getLocalDb, runExclusive, runTransactionExclusive } from '../utils/db';
 import { reportError } from './errors';
+import { postAnnouncementToTelegram } from './telegram';
 
 export type Announcement = {
   id: string;
@@ -26,6 +27,33 @@ export type Reply = {
   created_at: string;
   pending?: boolean; // true = still in outbox, not yet on server
 };
+
+/** GET /api/v1/announcements returns camelCase rows — flattened to match the
+ * snake_case shape every screen already reads. */
+function normalizeAnnouncement(raw: any): Announcement {
+  return {
+    id: raw.id,
+    church_id: raw.churchId,
+    title_am: raw.titleAm ?? null,
+    title_en: raw.titleEn ?? null,
+    body: raw.body,
+    locked: raw.locked,
+    posted_to_telegram: raw.postedToTelegram,
+    created_at: raw.createdAt,
+    reply_count: raw.replyCount ?? 0,
+  };
+}
+
+function normalizeReply(raw: any): Reply {
+  return {
+    id: raw.id,
+    announcement_id: raw.announcementId,
+    author_id: raw.authorId,
+    author_name: raw.authorName,
+    text: raw.text,
+    created_at: raw.createdAt,
+  };
+}
 
 async function cacheAnnouncements(rows: Announcement[]) {
   const d = await getLocalDb();
@@ -65,20 +93,14 @@ export function useAnnouncements() {
       // recent announcements, not a church's entire multi-year history. Older
       // ones stay reachable in the cache; the server list is capped so app-open
       // is O(50), not O(all announcements ever).
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*, replies(count)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (!error && data) {
-        const mapped: Announcement[] = data.map((a: any) => ({
-          ...a, reply_count: a.replies?.[0]?.count ?? 0,
-        }));
-        setItems(mapped);
-        await cacheAnnouncements(mapped);
-      }
+      const res = await apiFetch<{ announcements: any[] }>('/api/v1/announcements?limit=50');
+      const mapped = res.announcements.map(normalizeAnnouncement);
+      setItems(mapped);
+      await cacheAnnouncements(mapped);
     } catch (err) {
-      reportError(err, 'Announcements.load', 'am', false);
+      if (!(err instanceof OfflineError)) {
+        reportError(err, 'Announcements.load', 'am', false);
+      }
     }
   }, []);
 
@@ -104,18 +126,12 @@ export function useAnnouncements() {
 export async function fetchReplies(annId: string): Promise<Reply[]> {
   const d = await getLocalDb();
 
-  // Bounded: even a thread that somehow attracts thousands of replies loads a
-  // capped window, not the whole thing, so one busy thread can't OOM the app.
-  const { data, error } = await supabase
-    .from('replies')
-    .select('*')
-    .eq('announcement_id', annId)
-    .order('created_at', { ascending: true })
-    .limit(200);
-
   let server: Reply[];
-  if (!error && data) {
-    server = data as Reply[];
+  try {
+    // There is no standalone replies-list endpoint — replies come bundled
+    // with the announcement, bounded server-side (replyLimit, default 200).
+    const res = await apiFetch<{ replies: any[] }>(`/api/v1/announcements/${annId}?replyLimit=200`);
+    server = res.replies.map(normalizeReply);
     // Cache this thread so it's readable offline next time. Replace the whole
     // thread so deletions on the server are reflected locally too.
     await runTransactionExclusive(d, async () => {
@@ -129,7 +145,8 @@ export async function fetchReplies(annId: string): Promise<Reply[]> {
         );
       }
     });
-  } else {
+  } catch (err) {
+    if (!(err instanceof OfflineError)) reportError(err, 'fetchReplies', 'am', false);
     // Offline or failed — fall back to the cached thread.
     const cached = await d.getAllAsync<any>(
       `SELECT * FROM replies_cache WHERE announcement_id = ? ORDER BY created_at`,
@@ -168,17 +185,18 @@ export async function flushOutbox() {
     const d = await getLocalDb();
     const rows = await d.getAllAsync<any>(`SELECT * FROM outbox ORDER BY created_at`);
     for (const row of rows) {
-      const { error } = await supabase.from('replies').insert({
-        announcement_id: row.announcement_id,
-        author_id: row.author_id,
-        author_name: row.author_name,
-        text: row.text,
-      });
-      if (!error) {
+      // The server derives author_name from the caller's own profile — it
+      // isn't accepted from the client, so only `text` goes out.
+      try {
+        await apiFetch(`/api/v1/announcements/${row.announcement_id}/replies`, {
+          method: 'POST',
+          body: { text: row.text },
+        });
         await runExclusive(async () => {
           await d.runAsync(`DELETE FROM outbox WHERE id = ?`, [row.id]);
         });
-      } else {
+      } catch (err) {
+        if (err instanceof OfflineError) break; // stop on first failure, retry later
         const attempts = (row.attempts ?? 0) + 1;
         await runExclusive(async () => {
           if (attempts >= 5) await d.runAsync(`DELETE FROM outbox WHERE id = ?`, [row.id]);
@@ -191,8 +209,6 @@ export async function flushOutbox() {
     _flushing = false;
   }
 }
-
-import { postAnnouncementToTelegram } from './telegram';
 
 /* ---------- pastor: publish & delete ---------- */
 
@@ -208,23 +224,19 @@ export async function publishAnnouncement(a: {
   telegramSuccess?: boolean;
   telegramError?: string;
 }> {
-  const { data, error } = await supabase
-    .from('announcements')
-    .insert({
-      church_id: a.churchId,
-      author_id: a.authorId,
-      title_am: a.title,
-      title_en: a.title,
-      body: a.body,
-    })
-    .select('*')
-    .single();
-
-  if (error || !data) {
-    return { error: error?.message || 'Failed to publish announcement' };
+  let created: Announcement;
+  try {
+    // The backend stores separate Amharic/English titles; every current
+    // caller only collects one title, so it goes into both — same behaviour
+    // as before this rewrite (title_am and title_en were always identical).
+    const raw = await apiFetch<any>('/api/v1/announcements', {
+      method: 'POST',
+      body: { titleAm: a.title, titleEn: a.title, body: a.body },
+    });
+    created = normalizeAnnouncement(raw);
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Failed to publish announcement' };
   }
-
-  const created = data as Announcement;
 
   if (a.postToTelegram) {
     const res = await postAnnouncementToTelegram({
@@ -249,10 +261,17 @@ export async function publishAnnouncement(a: {
 }
 
 export async function deleteAnnouncement(annId: string): Promise<{ error?: string }> {
-  const { error } = await supabase.from('announcements').delete().eq('id', annId);
-  return error ? { error: error.message } : {};
+  try {
+    await apiFetch(`/api/v1/announcements/${annId}`, { method: 'DELETE' });
+    return {};
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Failed to delete announcement' };
+  }
 }
 
 export async function toggleLock(annId: string, locked: boolean) {
-  await supabase.from('announcements').update({ locked }).eq('id', annId);
+  await apiFetch(`/api/v1/announcements/${annId}/lock`, {
+    method: 'POST',
+    body: { locked },
+  });
 }

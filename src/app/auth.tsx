@@ -226,6 +226,23 @@ export default function Auth() {
     setErr(null);
 
     // Pastor Registration / Verification Flow
+    //
+    // NOT MIGRATED — still calls the dead Supabase project below. Left in
+    // place rather than deleted or half-rewritten, because the real backend
+    // doesn't support this flow as a single submit:
+    //   1. POST /api/v1/pastor-verification/upload-url and the submit route
+    //      are both gated behind requireVerifiedEmail — a pastor applicant
+    //      has to confirm their email (an out-of-band step, via the emailed
+    //      link) before they can even request an S3 upload URL, let alone
+    //      submit. This screen creates the account and submits the doc in one
+    //      action; the backend now requires an interstitial "check your
+    //      email" step in between that doesn't exist in this UI yet.
+    //   2. Doc upload is a 3-step dance against the new backend (POST
+    //      upload-url → PUT the file to the returned S3 URL → POST
+    //      /api/v1/pastor-verification {docPath, branchName}), not a single
+    //      supabase.storage.upload() call.
+    // Rewriting this needs a product decision on the new flow shape, not a
+    // mechanical call-site swap.
     if (mode === 'pastor') {
       const netState = await NetInfo.fetch();
       if (!netState.isConnected) {
@@ -364,6 +381,14 @@ export default function Auth() {
     }
 
     // "Other" church → register with no church yet + file a review request.
+    //
+    // NOT MIGRATED — still calls the dead Supabase project below. The real
+    // backend has admin.ts endpoints to LIST/approve/reject church_requests
+    // (GET /admin/church-requests, POST .../approve, .../reject) but no route
+    // for a regular signed-out user to CREATE one — nothing in backend/src
+    // inserts into churchRequests except the (admin-only) approval flow
+    // itself. This isn't a call-site mismatch to paper over; the endpoint
+    // this screen needs doesn't exist yet.
     if (isOther) {
       setTouched((prev) => ({ ...prev, otherChurch: true, churchRole: true }));
       const nameOk = otherChurchName.trim().length > 0;
