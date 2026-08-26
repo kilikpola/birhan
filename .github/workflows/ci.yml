@@ -1,0 +1,76 @@
+name: CI
+
+# Runs on every PR and on pushes to main. Make these jobs "required status
+# checks" in branch protection (Settings → Branches) so a red run blocks merge.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Mobile — typecheck & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test -- --ci
+
+  admin-web:
+    name: Admin web — build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: admin-web/package-lock.json
+      - run: npm ci
+      # No Sentry auth token in PR builds → the vite plugin disables itself and
+      # the build (incl. typecheck via `tsc -b`) still validates the app.
+      - run: npm run build
+
+  edge:
+    name: Edge Functions — typecheck & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check functions
+        run: deno check supabase/functions/**/*.ts
+      - name: Unit tests (shared helpers)
+        run: deno test supabase/functions/_shared/
+
+  # Optional guard: fails the job only if lint config exists and reports errors.
+  # Kept non-blocking (no eslint config committed yet); promote to required once
+  # an eslint baseline is added.
+  lint:
+    name: Lint (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx expo lint || true

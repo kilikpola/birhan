@@ -1,0 +1,20 @@
+To: [CONTACT — use the method listed at william-macdonald.org/bbc-translations]
+Subject: Inquiry regarding a potential Amharic translation of the Believer's Bible Commentary
+
+Dear Sir or Madam,
+
+I hope this email finds you well.
+
+I am writing to you on behalf of the Birhan Bible app project, a free, offline, and non-commercial Bible study application created to serve Protestant and Evangelical churches in Ethiopia.
+
+We are currently researching high-quality study resources for our users, and we wanted to inquire:
+1. Does an Amharic translation of William MacDonald's Believer's Bible Commentary (BBC) exist, or is one currently in progress or planned under your copyright?
+2. If an Amharic translation does exist or is underway, would it be possible to obtain permission to include it as a bundled commentary option within our free, non-commercial app? If so, what licensing, attribution, or copyright statements would you require us to display?
+3. If a translation is available, does it exist in a structured digital format (such as JSON, XML, or a database) that could be used for integration?
+
+Thank you very much for your time, your ministry, and your consideration of this inquiry.
+
+In Christ,
+
+[YOUR NAME]
+Birhan Bible App Project

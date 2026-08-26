@@ -1,0 +1,35 @@
+version: 2
+# Dependency updates arrive as PRs that must pass CI before they can merge.
+# Grouped to reduce PR noise; majors are separated so they get real review.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      expo:
+        patterns: ["expo", "expo-*", "@expo/*", "react-native*"]
+      dev-and-minor:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Expo pins RN/React to exact versions per SDK — bump these via `expo
+      # install` / an SDK upgrade, not Dependabot majors.
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: "/admin-web"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-and-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

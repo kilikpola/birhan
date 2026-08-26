@@ -1,0 +1,166 @@
+name: Deploy
+
+# Promotion flow:  merge to main → STAGING (auto) → PRODUCTION (manual approval).
+# PR previews are handled by the `preview` job in preview.yml.
+#
+# Production is gated by the GitHub Environment "production" — add required
+# reviewers there (Settings → Environments) so the prod job pauses for a human
+# click. If the post-deploy health/smoke check fails, prod auto-reverts.
+#
+# All credentials are GitHub secrets (see RUNBOOK.md → Secrets). Nothing here is
+# in the repo. Staging and production are SEPARATE Supabase projects and
+# SEPARATE Cloudflare Pages projects — staging never touches prod data.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------- STAGING
+  staging:
+    name: Deploy → staging
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Link staging project
+        run: supabase link --project-ref "${{ secrets.STAGING_SUPABASE_PROJECT_REF }}"
+
+      # Expand-then-contract migrations: db push applies only new, un-applied
+      # migrations (tracked in supabase_migrations). See supabase/MIGRATIONS.md.
+      - name: Apply migrations (staging)
+        run: supabase db push
+
+      - name: Deploy Edge Functions (staging)
+        run: |
+          supabase functions deploy health --no-verify-jwt
+          supabase functions deploy debug-error --no-verify-jwt
+          supabase functions deploy post-telegram-announcement
+          supabase functions deploy notify-announcement
+          supabase functions deploy telegram-webhook
+
+      - name: Build admin web (staging)
+        working-directory: admin-web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.ADMIN_SENTRY_DSN }}
+          VITE_ENV: staging
+          VITE_COMMIT_SHA: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: birhan-admin
+        run: npm ci && npm run build
+
+      - name: Deploy admin web → Cloudflare Pages (staging)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy admin-web/dist --project-name=${{ vars.CF_PAGES_PROJECT_STAGING }} --branch=main
+
+      - name: Smoke test (staging)
+        env:
+          SMOKE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SMOKE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          SMOKE_HEALTH_URL: ${{ secrets.STAGING_SUPABASE_URL }}/functions/v1/health
+          SMOKE_ADMIN_URL: https://admin-staging.birhan.cc
+        run: node tests/smoke/smoke.mjs
+
+  # ------------------------------------------------------------- PRODUCTION
+  production:
+    name: Deploy → production
+    needs: staging
+    runs-on: ubuntu-latest
+    # Requires manual approval — configure required reviewers on this Environment.
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.PROD_SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # need history to find the previous release tag
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Record the currently-live release (for rollback)
+        id: prev
+        run: echo "ref=$(git describe --tags --match 'release-*' --abbrev=0 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
+
+      - name: Link production project
+        run: supabase link --project-ref "${{ secrets.PROD_SUPABASE_PROJECT_REF }}"
+
+      - name: Apply migrations (production)
+        run: supabase db push
+
+      - name: Deploy Edge Functions (production)
+        run: |
+          supabase functions deploy health --no-verify-jwt
+          supabase functions deploy debug-error --no-verify-jwt
+          supabase functions deploy post-telegram-announcement
+          supabase functions deploy notify-announcement
+          supabase functions deploy telegram-webhook
+
+      - name: Build admin web (production)
+        working-directory: admin-web
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.PROD_SUPABASE_ANON_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.ADMIN_SENTRY_DSN }}
+          VITE_ENV: production
+          VITE_COMMIT_SHA: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: birhan-admin
+        run: npm ci && npm run build
+
+      - name: Deploy admin web → Cloudflare Pages (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy admin-web/dist --project-name=${{ vars.CF_PAGES_PROJECT_PROD }} --branch=production
+
+      # Deploy gate: health + smoke. If this fails, the next step auto-reverts.
+      - name: Health + smoke (production)
+        id: smoke
+        env:
+          SMOKE_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SMOKE_SUPABASE_ANON_KEY: ${{ secrets.PROD_SUPABASE_ANON_KEY }}
+          SMOKE_HEALTH_URL: ${{ secrets.PROD_SUPABASE_URL }}/functions/v1/health
+          SMOKE_ADMIN_URL: https://admin.birhan.cc
+        run: node tests/smoke/smoke.mjs
+
+      - name: AUTO-REVERT on failed health/smoke
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT_PROD }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROD_SUPABASE_PROJECT_REF: ${{ secrets.PROD_SUPABASE_PROJECT_REF }}
+          PREV_RELEASE_REF: ${{ steps.prev.outputs.ref }}
+        run: |
+          echo "::error::Production health/smoke failed — rolling back."
+          bash scripts/rollback.sh
+          exit 1   # keep the run red so humans are paged
+
+      - name: Tag successful release
+        if: success()
+        run: |
+          git tag "release-$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          git push --tags

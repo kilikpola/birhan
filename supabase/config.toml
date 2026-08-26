@@ -1,0 +1,39 @@
+# Minimal Supabase local config so `supabase start` works in CI (integration
+# workflow). Phase 3 will formalise this alongside the staging/prod migration
+# flow. Not used by the deployed projects — those are configured in the
+# dashboard.
+project_id = "birhan"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+
+[storage]
+enabled = true
+
+[analytics]
+enabled = false
+
+# Health probe must be reachable by uptime monitors / the deploy gate with no
+# user JWT. It exposes no data. Deploy prod/staging with `--no-verify-jwt` too.
+[functions.health]
+verify_jwt = false
+
+# debug-error gates itself on DEBUG_ERROR_SECRET, so it doesn't need a user JWT.
+[functions.debug-error]
+verify_jwt = false
