@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import * as DocumentPicker from 'expo-document-picker';
 
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useApp } from '../theme/context';
 import { radius, type Palette } from '../theme/tokens';
@@ -103,34 +103,39 @@ export default function Auth() {
   const availableRoles = getAllRolesForDenomination(selectedChurch?.denomination);
   const selectedRoleDef = availableRoles.find((r) => r.value === churchRole);
 
-  // Fetch churches when in sign-up or pastor mode
+  // Fetch churches when in sign-up or pastor mode. Public route — no token
+  // exists yet at this point in the flow.
   useEffect(() => {
     if (mode === 'up' || mode === 'pastor') {
-      supabase
-        .from('churches')
-        .select('id, name_am, name_en, denomination')
-        .order('name_en', { ascending: true })
-        .then(({ data, error }) => {
-          if (error) reportError(error, 'Auth.loadChurches', lang, false);
-          if (data) setChurches(data);
-        });
+      apiFetch<{ churches: any[] }>('/api/v1/churches', { auth: false })
+        .then((res) => {
+          const sorted = [...res.churches].sort((a, b) => a.nameEn.localeCompare(b.nameEn));
+          setChurches(
+            sorted.map((ch) => ({
+              id: ch.id,
+              name_am: ch.nameAm,
+              name_en: ch.nameEn,
+              denomination: ch.denomination,
+            })),
+          );
+        })
+        .catch((err) => reportError(err, 'Auth.loadChurches', lang, false));
     }
   }, [mode, lang]);
 
-  // Fetch branches dynamically based on selected church ID
+  // Fetch branches dynamically based on selected church ID. Also public.
   useEffect(() => {
     if (churchId && churchId !== OTHER_CHURCH) {
       setLoadingBranches(true);
-      supabase
-        .from('branches')
-        .select('id, name_am, name_en')
-        .eq('church_id', churchId)
-        .then(({ data, error }) => {
-          if (error) reportError(error, 'Auth.loadBranches', lang, false);
-          if (data) setBranches(data);
-          else setBranches([]);
-          setLoadingBranches(false);
-        });
+      apiFetch<{ branches: any[] }>(`/api/v1/churches/${churchId}/branches`, { auth: false })
+        .then((res) => {
+          setBranches(res.branches.map((b) => ({ id: b.id, name_am: b.nameAm, name_en: b.nameEn })));
+        })
+        .catch((err) => {
+          reportError(err, 'Auth.loadBranches', lang, false);
+          setBranches([]);
+        })
+        .finally(() => setLoadingBranches(false));
     } else {
       setBranches([]);
       setBranchId(null);
@@ -263,109 +268,13 @@ export default function Auth() {
         return;
       }
 
-      setBusy(true);
-      try {
-        const { data, error: signUpErr } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-        });
-
-        if (signUpErr) {
-          setErr(signUpErr.message);
-          setBusy(false);
-          return;
-        }
-
-        if (!data.user) {
-          setErr('Sign up failed.');
-          setBusy(false);
-          return;
-        }
-
-        const userId = data.user.id;
-        const response = await fetch(docFile.uri);
-        const blob = await response.blob();
-        const fileExt = docFile.name.split('.').pop() || 'pdf';
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
-
-        const { error: uploadErr } = await supabase.storage
-          .from('pastor-docs')
-          .upload(filePath, blob, {
-            contentType: docFile.mimeType || 'application/octet-stream',
-          });
-
-        if (uploadErr) {
-          setErr(
-            isAm
-              ? `ሰነድ መጫን አልተቻለም፦ ${uploadErr.message}`
-              : `Failed to upload document: ${uploadErr.message}`
-          );
-          setBusy(false);
-          return;
-        }
-
-        let createdBranchId: string | null = null;
-        if (pastorBranchName.trim()) {
-          const { data: bData } = await supabase
-            .from('branches')
-            .insert({
-              church_id: churchId,
-              name_am: pastorBranchName.trim(),
-              name_en: pastorBranchName.trim(),
-              created_by: userId,
-              is_mother_branch: isMotherBranch,
-            })
-            .select('id')
-            .single();
-          if (bData) {
-            createdBranchId = bData.id;
-          }
-        }
-
-        const { error: insertErr } = await supabase.from('profiles').insert({
-          id: userId,
-          display_name: name.trim(),
-          church_id: churchId,
-          branch_name: pastorBranchName.trim(),
-          branch_id: createdBranchId,
-          role: 'member',
-          language: prefLang,
-          phone: phone.trim() !== '+251' && phone.trim() !== '' ? phone.trim() : null,
-          church_role: churchRole || 'pastor',
-          is_mother_branch: isMotherBranch,
-        });
-
-        if (insertErr) {
-          setErr(insertErr.message);
-          setBusy(false);
-          return;
-        }
-
-        const { error: updateErr } = await supabase
-          .from('profiles')
-          .update({
-            role: 'pending_pastor',
-            pastor_status: 'pending',
-            pastor_doc_path: filePath,
-            pastor_requested_at: new Date().toISOString(),
-          })
-          .eq('id', userId);
-
-        if (updateErr) {
-          setErr(updateErr.message);
-          setBusy(false);
-          return;
-        }
-
-        await supabase.auth.refreshSession();
-        await refreshProfile();
-        setShowSuccessScreen(true);
-      } catch (ex: any) {
-        setErr(reportError(ex, 'Auth.submitPastor', lang));
-      } finally {
-        setBusy(false);
-      }
+      // Fails honestly rather than being built around — see the NOT MIGRATED
+      // note above and docs/KNOWN_GAPS.md.
+      setErr(
+        isAm
+          ? 'የፓስተር ምዝገባ አሁን ላይ አይገኝም። እባክዎ ቆይተው ይሞክሩ።'
+          : 'Pastor registration is not available yet. Please try again later.'
+      );
       return;
     }
 
@@ -399,56 +308,12 @@ export default function Auth() {
       const validRole = validateField('churchRole', churchRole);
       if (!nameOk || !validRole) return;
 
-      setBusy(true);
-      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
-      if (error) {
-        setErr(error.message);
-        setBusy(false);
-        return;
-      }
-      if (!data.user) {
-        setErr('Sign up failed');
-        setBusy(false);
-        return;
-      }
-      const userId = data.user.id;
-
-      const { error: pErr } = await supabase.from('profiles').insert({
-        id: userId,
-        display_name: name.trim(),
-        church_id: null,
-        role: 'member',
-        language: prefLang,
-        phone: phone.trim() !== '+251' && phone.trim() !== '' ? phone.trim() : null,
-        church_role: churchRole,
-      });
-      if (pErr) {
-        setErr(pErr.message);
-        setBusy(false);
-        return;
-      }
-
-      const { error: rErr } = await supabase.from('church_requests').insert({
-        requested_by: userId,
-        name_en: otherChurchName.trim(),
-        name_am: null,
-        city: otherChurchCity.trim() || null,
-        denomination: null,
-      });
-      if (rErr) {
-        setErr(rErr.message);
-        setBusy(false);
-        return;
-      }
-
-      await supabase.auth.refreshSession();
-      await refreshProfile();
-      setBusy(false);
-      Alert.alert(
-        isAm ? 'ጥያቄው ተልኳል' : 'Request submitted',
+      // Fails honestly rather than being built around — see the NOT MIGRATED
+      // note above and docs/KNOWN_GAPS.md.
+      setErr(
         isAm
-          ? 'ቤተ ክርስቲያንዎ እስኪጨመር ድረስ መጽሐፍ ቅዱስን ያለ ኢንተርኔት መጠቀም ይችላሉ።'
-          : 'You can read the Bible offline now. Your church will appear once an admin approves it.'
+          ? 'ቤተ ክርስቲያንዎ ገና አልተጨመረም? ይህ ባህሪ አሁን ላይ አይገኝም። እባክዎ ቆይተው ይሞክሩ።'
+          : "Registering with a church that isn't listed yet isn't available. Please try again later."
       );
       return;
     }

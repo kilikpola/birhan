@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import { supabase } from './supabase';
 import { reportError } from './errors';
 
 /**
@@ -108,16 +107,19 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 /**
- * Persist the device token in `push_tokens`. Tokens live in their own table (not
- * on `profiles`) so a member can read/write only their OWN token — otherwise any
- * member could read a fellow member's token and push arbitrary notifications to
- * their device via Expo's unauthenticated push API. RLS scopes the row to
- * `user_id = auth.uid()`.
+ * NOT AVAILABLE YET — see docs/KNOWN_GAPS.md.
+ *
+ * The old `push_tokens` table and its Supabase RLS policy (a member can only
+ * read/write their own token) don't exist in backend/ at all: no table, no
+ * route, nothing under backend/src/ matches "push". The fanout itself — a
+ * Supabase Edge Function triggered on new announcements — is gone too, with
+ * no replacement. This isn't a call-site swap; it's a whole missing
+ * subsystem (storage + fanout), so this fails honestly instead of being
+ * built around. usePushNotifications() below already treats a failure here
+ * as non-fatal — it reports and moves on, never blocking the offline Bible.
  */
 export async function savePushToken(userId: string, token: string): Promise<void> {
-  await supabase
-    .from('push_tokens')
-    .upsert({ user_id: userId, token, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  throw new Error('Push notifications are not available yet — see docs/KNOWN_GAPS.md');
 }
 
 /**

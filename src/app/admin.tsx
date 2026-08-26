@@ -16,10 +16,12 @@ import { useApp } from '../theme/context';
 import { t } from '../i18n';
 import { fonts, radius, space } from '../theme/tokens';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import {
   useAnnouncements,
   publishAnnouncement,
+  deleteAnnouncement,
+  deleteReply,
   fetchReplies,
   toggleLock,
   Announcement,
@@ -61,7 +63,7 @@ export default function AdminScreen() {
   // Check Telegram link status when church_id changes
   useEffect(() => {
     if (profile?.church_id) {
-      getTelegramLinkStatus(profile.church_id).then((status) => {
+      getTelegramLinkStatus().then((status) => {
         setIsTelegramLinked(status.isLinked);
         setPostToTelegram(status.isLinked);
       });
@@ -118,23 +120,20 @@ export default function AdminScreen() {
     if (!profile?.church_id) return;
     setLoadingMembers(true);
     try {
-      const { data: churchData } = await supabase
-        .from('churches')
-        .select('member_count')
-        .eq('id', profile.church_id)
-        .single();
-      if (churchData) setMemberCount(churchData.member_count);
-
-      // Bounded: a large church's full roster would otherwise pull every
-      // member row onto the phone. Cap it; total headcount is shown separately
-      // from churches.member_count (maintained by a trigger, not counted here).
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, display_name, role, branch_name, created_at')
-        .eq('church_id', profile.church_id)
-        .order('display_name', { ascending: true })
-        .limit(200);
-      if (profilesData) setMembers(profilesData);
+      // One call gives both the page of members and the DB-counted total —
+      // replaces the old two-query (churches.member_count + profiles list)
+      // pattern.
+      const res = await apiFetch<{ members: any[]; total: number }>('/api/v1/members?limit=200');
+      setMemberCount(res.total);
+      setMembers(
+        res.members.map((m) => ({
+          id: m.id,
+          display_name: m.displayName,
+          role: m.role,
+          branch_name: m.branchName ?? null,
+          created_at: m.createdAt,
+        })),
+      );
     } catch (err) {
       reportError(err, 'Admin.loadMembers', lang, false);
     } finally {
@@ -259,9 +258,9 @@ export default function AdminScreen() {
           text: t(lang, 'delete'),
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase.from('announcements').delete().eq('id', annId);
-            if (error) {
-              reportError(error, 'Admin.handleDeleteAnn', lang);
+            const res = await deleteAnnouncement(annId);
+            if (res.error) {
+              reportError(new Error(res.error), 'Admin.handleDeleteAnn', lang);
             } else {
               if (selectedAnnId === annId) setSelectedAnnId(null);
               reloadAnns();
@@ -274,9 +273,9 @@ export default function AdminScreen() {
 
   // Delete Reply
   const handleDeleteReply = async (replyId: string) => {
-    const { error } = await supabase.from('replies').delete().eq('id', replyId);
-    if (error) {
-      reportError(error, 'Admin.handleDeleteReply', lang);
+    const res = await deleteReply(replyId);
+    if (res.error) {
+      reportError(new Error(res.error), 'Admin.handleDeleteReply', lang);
     } else {
       loadReplies();
       reloadAnns();
@@ -891,7 +890,7 @@ export default function AdminScreen() {
 
             {activeTab === 'telegram' && profile?.church_id && profile?.id && (
               <SectionBoundary name="Admin.Telegram">
-                <TelegramSettings churchId={profile.church_id} userId={profile.id} />
+                <TelegramSettings />
               </SectionBoundary>
             )}
           </View>

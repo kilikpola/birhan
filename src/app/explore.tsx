@@ -9,7 +9,7 @@ import { Cross } from "@/components/cross";
 import { Icon } from "@/components/icon";
 import { Logo } from "@/components/logo";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { radius, space, fonts } from "@/theme/tokens";
 import { SectionBoundary } from "@/components/section-boundary";
 import { reportError } from "@/lib/errors";
@@ -52,20 +52,19 @@ export default function MoreScreen() {
     setChurchNameEn(profile.church_name_en || seededChurch?.en || "");
 
     let active = true;
-    supabase
-      .from("churches")
-      .select("name_am, name_en")
-      .eq("id", profile.church_id)
-      .single()
-      .then(({ data, error }) => {
+    // No single-church-by-id route exists — only list-all (GET /churches) and
+    // branches-by-church. Fetching the full list is what's available; it's
+    // public and small, but this re-downloads every church for one lookup.
+    apiFetch<{ churches: any[] }>("/api/v1/churches", { auth: false })
+      .then((res) => {
         if (!active) return;
-        if (error) {
-          reportError(error, "Explore.loadChurch", "am", false);
-        } else if (data) {
-          setChurchNameAm(data.name_am);
-          setChurchNameEn(data.name_en);
+        const data = res.churches.find((ch) => ch.id === profile.church_id);
+        if (data) {
+          setChurchNameAm(data.nameAm);
+          setChurchNameEn(data.nameEn);
         }
-      });
+      })
+      .catch((err) => reportError(err, "Explore.loadChurch", "am", false));
     return () => { active = false; };
   }, [profile?.church_id, profile?.church_name_am, profile?.church_name_en]);
 

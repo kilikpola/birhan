@@ -91,7 +91,7 @@ export default function Today() {
       return;
     }
 
-    getTelegramLinkStatus(churchId)
+    getTelegramLinkStatus()
       .then((status) => {
         if (!active) return;
         setIsTelegramLinked(status.isLinked);

@@ -5,7 +5,7 @@ import { documentDirectory, cacheDirectory } from 'expo-file-system/legacy';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { supabase } from './supabase';
+import { apiFetch, ApiError } from './api';
 import { reportError } from './errors';
 
 export type ResourceCategory =
@@ -45,6 +45,26 @@ export type UploadResourcePayload = {
   fileSize: number;
   mimeType: string;
 };
+
+/** GET /api/v1/resources returns camelCase — flattened to match every
+ * existing call site's snake_case reads (resources.tsx, admin.tsx). */
+function normalizeResource(raw: any): Resource {
+  return {
+    id: raw.id,
+    church_id: raw.churchId,
+    branch_id: raw.branchId ?? null,
+    uploaded_by: raw.uploadedBy,
+    title_am: raw.titleAm ?? null,
+    title_en: raw.titleEn ?? null,
+    description: raw.description ?? null,
+    category: raw.category,
+    file_path: raw.filePath,
+    file_size_bytes: raw.fileSizeBytes,
+    mime_type: raw.mimeType,
+    rights_confirmed: raw.rightsConfirmed,
+    created_at: raw.createdAt,
+  };
+}
 
 const KEY_RESOURCES_CACHE = 'birhan:resources_cache:';
 const KEY_BYTES_USED = 'birhan:bytesThisMonth';
@@ -89,42 +109,34 @@ async function recordDataUsage(bytes: number) {
 
 /**
  * Fetches resources list for a church, falling back to local cache if offline.
+ * `churchId` is only used for the local cache key now — GET /api/v1/resources
+ * is always scoped server-side to the caller's own church (from the JWT), the
+ * same as every other backend route.
  */
 export async function fetchResourcesList(churchId: string): Promise<Resource[]> {
   const cacheKey = `${KEY_RESOURCES_CACHE}${churchId}`;
 
   try {
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('church_id', churchId)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    if (error) throw error;
-
-    if (data) {
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
-      return data as Resource[];
-    }
-  } catch (err: any) {
+    // 100 is the backend's own cap (services/resources.ts: `Math.min(limit,
+    // 100)`) — the old Supabase query asked for up to 200, so a church with
+    // more than 100 resources will now see fewer than before.
+    const res = await apiFetch<{ resources: any[] }>('/api/v1/resources?limit=100');
+    const mapped = res.resources.map(normalizeResource);
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(mapped));
+    return mapped;
+  } catch (err) {
     // Fallback to offline cache
     const cached = await AsyncStorage.getItem(cacheKey);
     if (cached) {
       try {
         return JSON.parse(cached) as Resource[];
-      } catch (parseErr) {
+      } catch {
         // Fall through
       }
     }
-    // If table doesn't exist yet on remote database (PGRST205 schema cache), return empty array
-    if (err?.code === 'PGRST205' || String(err?.message || '').includes('public.resources')) {
-      return [];
-    }
+    if (err instanceof ApiError) return [];
     throw err;
   }
-
-  return [];
 }
 
 /**
@@ -197,17 +209,11 @@ export async function downloadResource(
     return localUri;
   }
 
-  // Get signed URL or download URL from Supabase Storage
-  const { data, error } = await supabase.storage
-    .from('church-docs')
-    .createSignedUrl(resource.file_path, 3600);
-
-  if (error || !data?.signedUrl) {
-    throw new Error(error?.message || 'Could not get download URL for document');
-  }
+  // Presigned S3 GET URL, valid briefly — replaces Supabase's signed URL.
+  const { url } = await apiFetch<{ url: string }>(`/api/v1/resources/${resource.id}/download-url`);
 
   const downloadTask = FileSystem.createDownloadResumable(
-    data.signedUrl,
+    url,
     localUri,
     {},
     (downloadProgress) => {
@@ -256,7 +262,7 @@ export async function openResource(resource: Resource): Promise<void> {
 }
 
 /**
- * Uploads a document to church-docs bucket and inserts resource metadata in DB.
+ * Uploads a document via a presigned S3 URL, then commits its metadata.
  * Explicitly enforces rights_confirmed attestation.
  */
 export async function uploadResource(payload: UploadResourcePayload): Promise<{ data?: Resource; error?: string }> {
@@ -269,54 +275,52 @@ export async function uploadResource(payload: UploadResourcePayload): Promise<{ 
     return { error: 'File size exceeds the 10 MB limit.' };
   }
 
-  try {
-    const resourceId = window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
-    const sanitizeName = payload.fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `${payload.churchId}/${resourceId}/${sanitizeName}`;
+  // The upload UI (admin.tsx) only requires ONE of the two titles to be
+  // filled in — but the backend's commit schema requires both non-empty.
+  // Falling the empty one back to the other, same as announcements' title_am
+  // /title_en duplication, rather than changing the upload form's validation.
+  const titleAm = payload.titleAm?.trim() || payload.titleEn?.trim() || 'Untitled';
+  const titleEn = payload.titleEn?.trim() || payload.titleAm?.trim() || 'Untitled';
 
-    // Read binary file data into ArrayBuffer/Blob for Supabase storage upload
+  try {
+    const { resourceId, url, key } = await apiFetch<{ resourceId: string; url: string; key: string }>(
+      '/api/v1/resources/upload-url',
+      {
+        method: 'POST',
+        body: { filename: payload.fileName, mimeType: payload.mimeType, fileSizeBytes: payload.fileSize },
+      },
+    );
+
     const fileResponse = await fetch(payload.fileUri);
     const blob = await fileResponse.blob();
 
-    const { error: uploadError } = await supabase.storage
-      .from('church-docs')
-      .upload(storagePath, blob, {
-        contentType: payload.mimeType,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw uploadError;
+    const putRes = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': payload.mimeType },
+      body: blob,
+    });
+    if (!putRes.ok) {
+      throw new Error(`Upload to storage failed with status ${putRes.status}`);
     }
 
-    const { data: dbData, error: dbError } = await supabase
-      .from('resources')
-      .insert({
-        id: resourceId,
-        church_id: payload.churchId,
-        branch_id: payload.branchId || null,
-        uploaded_by: payload.uploadedBy,
-        title_am: payload.titleAm || null,
-        title_en: payload.titleEn || null,
-        description: payload.description || null,
+    const raw = await apiFetch<any>('/api/v1/resources', {
+      method: 'POST',
+      body: {
+        resourceId,
+        key,
+        titleAm,
+        titleEn,
+        description: payload.description,
         category: payload.category,
-        file_path: storagePath,
-        file_size_bytes: payload.fileSize,
-        mime_type: payload.mimeType,
-        rights_confirmed: true,
-      })
-      .select('*')
-      .single();
+        fileSizeBytes: payload.fileSize,
+        mimeType: payload.mimeType,
+        rightsConfirmed: payload.rightsConfirmed,
+      },
+    });
 
-    if (dbError) {
-      // Clean up uploaded file if DB insert fails
-      await supabase.storage.from('church-docs').remove([storagePath]);
-      throw dbError;
-    }
-
-    return { data: dbData as Resource };
+    return { data: normalizeResource(raw) };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    return { error: err instanceof ApiError ? err.message : (err instanceof Error ? err.message : String(err)) };
   }
 }
 
@@ -325,20 +329,7 @@ export async function uploadResource(payload: UploadResourcePayload): Promise<{ 
  */
 export async function deleteResource(resource: Resource): Promise<{ error?: string }> {
   try {
-    const { error: storageError } = await supabase.storage
-      .from('church-docs')
-      .remove([resource.file_path]);
-
-    if (storageError) {
-      console.warn('Storage deletion notice:', storageError.message);
-    }
-
-    const { error: dbError } = await supabase
-      .from('resources')
-      .delete()
-      .eq('id', resource.id);
-
-    if (dbError) throw dbError;
+    await apiFetch(`/api/v1/resources/${resource.id}`, { method: 'DELETE' });
 
     // Delete local cached copy if exists
     const filename = resource.file_path.split('/').pop() || 'document.pdf';
@@ -347,22 +338,21 @@ export async function deleteResource(resource: Resource): Promise<{ error?: stri
 
     return {};
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    return { error: err instanceof ApiError ? err.message : (err instanceof Error ? err.message : String(err)) };
   }
 }
 
 /**
- * Calculates total storage used by church in bytes.
+ * Calculates total storage used by the caller's church in bytes.
+ *
+ * Approximate: there's no dedicated storage-usage endpoint, so this sums
+ * fileSizeBytes off the same capped (max 100) resource list used elsewhere.
+ * A church with more than 100 resources will undercount.
  */
 export async function getChurchStorageUsed(churchId: string): Promise<number> {
   try {
-    const { data, error } = await supabase
-      .from('resources')
-      .select('file_size_bytes')
-      .eq('church_id', churchId);
-
-    if (error || !data) return 0;
-    return data.reduce((sum, item) => sum + (Number(item.file_size_bytes) || 0), 0);
+    const list = await fetchResourcesList(churchId);
+    return list.reduce((sum, item) => sum + (Number(item.file_size_bytes) || 0), 0);
   } catch {
     return 0;
   }

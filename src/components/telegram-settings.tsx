@@ -13,16 +13,12 @@ import {
   TelegramLinkStatus,
 } from '../lib/telegram';
 
-type TelegramSettingsProps = {
-  churchId: string;
-  userId: string;
-};
-
-export function TelegramSettings({ churchId, userId }: TelegramSettingsProps) {
+export function TelegramSettings() {
   const { c, lang } = useApp();
   const [status, setStatus] = useState<TelegramLinkStatus>({
     isLinked: false,
     chatId: null,
+    chatTitle: null,
     verifiedAt: null,
   });
   const [loading, setLoading] = useState(true);
@@ -37,10 +33,10 @@ export function TelegramSettings({ churchId, userId }: TelegramSettingsProps) {
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
-    const res = await getTelegramLinkStatus(churchId);
+    const res = await getTelegramLinkStatus();
     setStatus(res);
     setLoading(false);
-  }, [churchId]);
+  }, []);
 
   useEffect(() => {
     loadStatus();
@@ -75,7 +71,7 @@ export function TelegramSettings({ churchId, userId }: TelegramSettingsProps) {
   const handleGenerateCode = async () => {
     setErr(null);
     setGenerating(true);
-    const res = await generateTelegramLinkCode(churchId, userId);
+    const res = await generateTelegramLinkCode();
     setGenerating(false);
 
     if (res.error) {
@@ -106,7 +102,7 @@ export function TelegramSettings({ churchId, userId }: TelegramSettingsProps) {
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
-            const res = await unlinkTelegramGroup(churchId);
+            const res = await unlinkTelegramGroup();
             if (res.error) {
               setErr(res.error);
             } else {

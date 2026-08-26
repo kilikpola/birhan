@@ -19,7 +19,7 @@ import { useApp } from '../theme/context';
 import { t } from '../i18n';
 import { fonts, radius, space } from '../theme/tokens';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
+import { apiFetch, ApiError } from '../lib/api';
 import { reportError } from '../lib/errors';
 import { Icon } from '../components/icon';
 
@@ -56,34 +56,40 @@ export default function VerificationScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(
-        'id, display_name, church_id, branch_name, church_role, pastor_status, pastor_doc_path, pastor_rejected_reason, pastor_requested_at',
-      )
-      .eq('pastor_status', filter)
-      .order('pastor_requested_at', { ascending: true });
-
-    if (error) {
-      reportError(error, 'Verification.load', lang, false);
-      setRows([]);
-    } else {
-      const list = (data as PendingProfile[]) ?? [];
+    try {
+      const res = await apiFetch<{ applications: any[] }>(
+        `/api/v1/admin/pastor-applications?status=${filter}`,
+      );
+      const list: PendingProfile[] = res.applications.map((raw) => ({
+        id: raw.id,
+        display_name: raw.displayName,
+        church_id: raw.churchId ?? null,
+        // The queue's `branch_name` meant two different things depending on
+        // stage in the old schema: the applicant's self-reported branch
+        // before approval (`pastorBranchName`), or the real linked branch
+        // once approved (`branchName`) — prefer whichever exists.
+        branch_name: raw.branchName ?? raw.pastorBranchName ?? null,
+        church_role: raw.churchRole ?? null,
+        pastor_status: raw.pastorStatus,
+        pastor_doc_path: raw.pastorDocPath ?? null,
+        pastor_rejected_reason: raw.pastorRejectedReason ?? null,
+        pastor_requested_at: raw.pastorRequestedAt ?? null,
+      }));
       setRows(list);
-      const ids = [...new Set(list.map((r) => r.church_id).filter(Boolean))] as string[];
-      if (ids.length) {
-        const { data: churches } = await supabase
-          .from('churches')
-          .select('id, name_en, name_am')
-          .in('id', ids);
-        const map: Record<string, string> = {};
-        (churches ?? []).forEach((ch: { id: string; name_en: string; name_am: string }) => {
-          map[ch.id] = isAm ? ch.name_am : ch.name_en;
-        });
-        setChurchNames(map);
-      } else {
-        setChurchNames({});
-      }
+
+      // The applications list only carries churchName in English
+      // (services/pastor-verification.ts joins churches.nameEn only) — fetch
+      // the admin church list separately to keep the Amharic name available,
+      // same as the two-step lookup this screen already did.
+      const res2 = await apiFetch<{ churches: any[] }>('/api/v1/admin/churches');
+      const map: Record<string, string> = {};
+      res2.churches.forEach((ch: any) => {
+        map[ch.id] = isAm ? ch.nameAm : ch.nameEn;
+      });
+      setChurchNames(map);
+    } catch (err) {
+      reportError(err, 'Verification.load', lang, false);
+      setRows([]);
     }
     setLoading(false);
   }, [filter, isAm, lang]);
@@ -107,18 +113,19 @@ export default function VerificationScreen() {
 
   const viewDoc = async (row: PendingProfile) => {
     if (!row.pastor_doc_path) return;
-    const { data, error } = await supabase.storage
-      .from('pastor-docs')
-      .createSignedUrl(row.pastor_doc_path, 3600);
-    if (error || !data?.signedUrl) {
-      Alert.alert(t(lang, 'errGeneric'), error?.message ?? 'No URL');
+    let url: string;
+    try {
+      const res = await apiFetch<{ url: string }>(`/api/v1/admin/pastor-applications/${row.id}/document`);
+      url = res.url;
+    } catch (err) {
+      Alert.alert(t(lang, 'errGeneric'), err instanceof ApiError ? err.message : 'No URL');
       return;
     }
     try {
-      await Linking.openURL(data.signedUrl);
+      await Linking.openURL(url);
     } catch {
       try {
-        await WebBrowser.openBrowserAsync(data.signedUrl);
+        await WebBrowser.openBrowserAsync(url);
       } catch (err) {
         reportError(err, 'Verification.viewDoc', lang);
       }
@@ -127,37 +134,34 @@ export default function VerificationScreen() {
 
   const approve = async (row: PendingProfile) => {
     setBusyId(row.id);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: 'pastor', pastor_status: 'approved', pastor_rejected_reason: null })
-      .eq('id', row.id);
-    setBusyId(null);
-    if (error) {
-      reportError(error, 'Verification.approve', lang);
-    } else {
+    try {
+      await apiFetch(`/api/v1/admin/pastor-applications/${row.id}/approve`, { method: 'POST' });
+      setBusyId(null);
       Alert.alert(t(lang, 'verificationApproved'), t(lang, 'verificationSignOutNote'));
       load();
+    } catch (err) {
+      setBusyId(null);
+      reportError(err, 'Verification.approve', lang);
     }
   };
 
   const confirmReject = async () => {
     if (!rejecting) return;
     setBusyId(rejecting.id);
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        role: 'member',
-        pastor_status: 'rejected',
-        pastor_rejected_reason: rejectReason.trim() || 'Not specified',
-      })
-      .eq('id', rejecting.id);
-    setBusyId(null);
-    setRejecting(null);
-    setRejectReason('');
-    if (error) {
-      reportError(error, 'Verification.reject', lang);
-    } else {
+    try {
+      await apiFetch(`/api/v1/admin/pastor-applications/${rejecting.id}/reject`, {
+        method: 'POST',
+        body: { reason: rejectReason.trim() || 'Not specified' },
+      });
+      setBusyId(null);
+      setRejecting(null);
+      setRejectReason('');
       load();
+    } catch (err) {
+      setBusyId(null);
+      setRejecting(null);
+      setRejectReason('');
+      reportError(err, 'Verification.reject', lang);
     }
   };
 

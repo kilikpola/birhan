@@ -269,6 +269,15 @@ export async function deleteAnnouncement(annId: string): Promise<{ error?: strin
   }
 }
 
+export async function deleteReply(replyId: string): Promise<{ error?: string }> {
+  try {
+    await apiFetch(`/api/v1/replies/${replyId}`, { method: 'DELETE' });
+    return {};
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Failed to delete reply' };
+  }
+}
+
 export async function toggleLock(annId: string, locked: boolean) {
   await apiFetch(`/api/v1/announcements/${annId}/lock`, {
     method: 'POST',

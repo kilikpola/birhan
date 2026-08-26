@@ -1,8 +1,9 @@
-import { supabase } from './supabase';
+import { apiFetch, ApiError } from './api';
 
 export type TelegramLinkStatus = {
   isLinked: boolean;
   chatId: string | null;
+  chatTitle: string | null;
   verifiedAt: string | null;
 };
 
@@ -13,84 +14,48 @@ export type TelegramCodeResult = {
 };
 
 /**
- * Generates a short 6-character random link code (e.g. BIRHAN-4F2K) valid for 10 minutes.
- * Saved in telegram_link_codes table with church_id, created_by, and expires_at.
+ * Requests a short-lived link code from the backend (POST /telegram/link-code).
+ * The church and requesting user are both derived server-side from the JWT —
+ * never accepted from the client — so this takes no arguments.
  */
-export async function generateTelegramLinkCode(
-  churchId: string,
-  userId: string
-): Promise<TelegramCodeResult> {
+export async function generateTelegramLinkCode(): Promise<TelegramCodeResult> {
   try {
-    const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const code = `BIRHAN-${randomChars}`;
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10-minute expiry
-
-    const { error } = await supabase.from('telegram_link_codes').insert({
-      church_id: churchId,
-      code,
-      created_by: userId,
-      expires_at: expiresAt.toISOString(),
+    const res = await apiFetch<{ code: string; expiresAt: string }>('/api/v1/telegram/link-code', {
+      method: 'POST',
     });
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    return { code, expiresAt };
-  } catch (err: any) {
-    return { error: err.message || String(err) };
+    return { code: res.code, expiresAt: new Date(res.expiresAt) };
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Failed to generate a link code' };
   }
 }
 
 /**
- * Gets Telegram group link status for a church.
+ * Gets Telegram group link status for the caller's own church.
  */
-export async function getTelegramLinkStatus(churchId: string): Promise<TelegramLinkStatus> {
+export async function getTelegramLinkStatus(): Promise<TelegramLinkStatus> {
   try {
-    const { data, error } = await supabase
-      .from('churches')
-      .select('telegram_chat_id, telegram_verified_at')
-      .eq('id', churchId)
-      .maybeSingle();
-
-    if (error || !data) {
-      return { isLinked: false, chatId: null, verifiedAt: null };
-    }
-
-    const isLinked = Boolean(data.telegram_chat_id && data.telegram_verified_at);
-    return {
-      isLinked,
-      chatId: data.telegram_chat_id || null,
-      verifiedAt: data.telegram_verified_at || null,
-    };
+    return await apiFetch<TelegramLinkStatus>('/api/v1/telegram/status');
   } catch {
-    return { isLinked: false, chatId: null, verifiedAt: null };
+    return { isLinked: false, chatId: null, chatTitle: null, verifiedAt: null };
   }
 }
 
 /**
- * Unlinks a church's Telegram group by clearing telegram_chat_id and telegram_verified_at.
+ * Unlinks the caller's church's Telegram group.
  */
-export async function unlinkTelegramGroup(churchId: string): Promise<{ error?: string }> {
+export async function unlinkTelegramGroup(): Promise<{ error?: string }> {
   try {
-    const { error } = await supabase
-      .from('churches')
-      .update({
-        telegram_chat_id: null,
-        telegram_verified_at: null,
-      })
-      .eq('id', churchId);
-
-    if (error) return { error: error.message };
+    await apiFetch('/api/v1/telegram/link', { method: 'DELETE' });
     return {};
-  } catch (err: any) {
-    return { error: err.message || String(err) };
+  } catch (err) {
+    return { error: err instanceof ApiError ? err.message : 'Failed to unlink' };
   }
 }
 
 /**
- * Dispatches an announcement to Telegram via post-telegram-announcement Edge Function.
- * Returns success boolean and error message if Telegram post fails.
+ * Mirrors an already-published announcement into the linked Telegram group.
+ * Always resolves (never throws on delivery failure) — the announcement is
+ * already published either way, and the app offers a retry instead of an error.
  */
 export async function postAnnouncementToTelegram(payload: {
   announcementId: string;
@@ -99,20 +64,13 @@ export async function postAnnouncementToTelegram(payload: {
   body: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('post-telegram-announcement', {
-      body: payload,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    if (data?.posted || data?.ok) {
-      return { success: true };
-    }
-
-    return { success: false, error: data?.error || 'Failed to send to Telegram' };
-  } catch (err: any) {
-    return { success: false, error: err.message || String(err) };
+    const res = await apiFetch<{ success: boolean; error?: string; detail?: string }>(
+      `/api/v1/telegram/announcements/${payload.announcementId}`,
+      { method: 'POST' },
+    );
+    if (res.success) return { success: true };
+    return { success: false, error: res.detail || res.error || 'Failed to send to Telegram' };
+  } catch (err) {
+    return { success: false, error: err instanceof ApiError ? err.message : 'Failed to send to Telegram' };
   }
 }

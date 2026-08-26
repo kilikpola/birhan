@@ -1,31 +1,20 @@
 import { generateTelegramLinkCode } from '../src/lib/telegram';
 
-// Mock Supabase
-jest.mock('../src/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn().mockReturnValue({
-      insert: jest.fn().mockResolvedValue({ error: null }),
-      select: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({
-          maybeSingle: jest.fn().mockResolvedValue({
-            data: { telegram_chat_id: '-10012345678', telegram_verified_at: '2026-07-24T00:00:00Z' },
-            error: null,
-          }),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    }),
-    functions: {
-      invoke: jest.fn().mockResolvedValue({ data: { posted: true }, error: null }),
-    },
-  },
+// Mock the backend fetch wrapper — generateTelegramLinkCode now calls
+// POST /api/v1/telegram/link-code instead of inserting into Supabase
+// directly. The church/user are derived server-side from the JWT, so the
+// function itself takes no arguments any more.
+jest.mock('../src/lib/api', () => ({
+  apiFetch: jest.fn().mockImplementation(() => {
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    return Promise.resolve({ code: 'BIRHAN-4F2K', expiresAt: expiresAt.toISOString() });
+  }),
+  ApiError: class ApiError extends Error {},
 }));
 
 describe('Telegram Integration Unit Tests', () => {
   it('generates valid link code format BIRHAN-XXXX', async () => {
-    const res = await generateTelegramLinkCode('church-123', 'user-456');
+    const res = await generateTelegramLinkCode();
     expect(res.error).toBeUndefined();
     expect(res.code).toBeDefined();
     expect(res.code).toMatch(/^BIRHAN-[A-Z0-9]{4,6}$/);
@@ -33,7 +22,7 @@ describe('Telegram Integration Unit Tests', () => {
 
   it('sets expiry to 10 minutes in the future', async () => {
     const now = Date.now();
-    const res = await generateTelegramLinkCode('church-123', 'user-456');
+    const res = await generateTelegramLinkCode();
     expect(res.expiresAt).toBeDefined();
     const diffMins = (res.expiresAt!.getTime() - now) / (1000 * 60);
     expect(diffMins).toBeGreaterThan(9.8);
