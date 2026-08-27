@@ -1,6 +1,6 @@
 import { db } from "../db/index.js";
 import { profiles, branches } from "../db/schema.js";
-import { eq, count } from "drizzle-orm";
+import { eq, and, isNull, count } from "drizzle-orm";
 import type { AuthContext } from "../types/index.js";
 import { requireAuth } from "./role-check.js";
 
@@ -21,7 +21,10 @@ export async function listMembers(ctx: AuthContext, limit = 200) {
   })
   .from(profiles)
   .leftJoin(branches, eq(profiles.branchId, branches.id))
-  .where(eq(profiles.churchId, ctx.churchId))
+  // Deleted accounts keep their row so their replies still make sense, but
+  // they are not people in this church any more and must not appear on a
+  // roster or in a headcount.
+  .where(and(eq(profiles.churchId, ctx.churchId), isNull(profiles.deletedAt)))
   .orderBy(profiles.displayName)
   .limit(limit);
 
@@ -29,7 +32,7 @@ export async function listMembers(ctx: AuthContext, limit = 200) {
   // members, so it must not be inferred from the returned rows.
   const [{ value: total }] = await db.select({ value: count() })
     .from(profiles)
-    .where(eq(profiles.churchId, ctx.churchId));
+    .where(and(eq(profiles.churchId, ctx.churchId), isNull(profiles.deletedAt)));
 
   return { members, total };
 }

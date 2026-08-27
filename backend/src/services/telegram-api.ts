@@ -162,3 +162,65 @@ export async function isChatAdministrator(chatId: string, userId: string): Promi
   if (!res.ok || !res.result) return false;
   return res.result.status === "creator" || res.result.status === "administrator";
 }
+
+/**
+ * Removes someone from a group without leaving them banned.
+ *
+ * `banChatMember` is the only way the Bot API offers to eject a member, and on
+ * its own it is permanent: the person cannot come back, and cannot be invited
+ * back, until someone unbans them. Immediately unbanning undoes the ban and
+ * leaves the removal — which is what account deletion actually means. Someone
+ * who deletes their Birhan account and later makes a new one has to be able to
+ * rejoin their church's group.
+ *
+ * `only_if_banned` keeps the unban from doubling as an invitation for anyone
+ * who was not in fact banned by the call above.
+ *
+ * The hard limit worth being honest about: this works only where the bot is an
+ * administrator with the right to remove members — in practice, groups a pastor
+ * linked to their church through Birhan. Anywhere else Telegram refuses, and it
+ * is right to. The refusal comes back as `not_admin` rather than being
+ * swallowed, so the caller can say which groups it could not touch.
+ */
+export type RemoveMemberOutcome =
+  | { ok: true }
+  | { ok: false; reason: "not_admin" | "disabled" | "failed"; detail?: string };
+
+export async function removeChatMember(
+  chatId: string,
+  userId: string,
+): Promise<RemoveMemberOutcome> {
+  const banned = await callTelegram("banChatMember", {
+    chat_id: chatId,
+    user_id: userId,
+  });
+
+  if (!banned.ok) {
+    if (banned.error === "disabled") return { ok: false, reason: "disabled" };
+    // 400 CHAT_ADMIN_REQUIRED / "not enough rights"; 403 when the bot itself
+    // has been removed from the chat.
+    if (banned.errorCode === 400 || banned.errorCode === 403) {
+      return { ok: false, reason: "not_admin", detail: banned.error };
+    }
+    return { ok: false, reason: "failed", detail: banned.error };
+  }
+
+  // Best-effort by design. The person is already out of the group at this
+  // point, which is what was asked for; a failure here leaves them banned
+  // rather than merely removed, which is worth logging but is not worth
+  // reporting as "we could not remove you".
+  const unbanned = await callTelegram("unbanChatMember", {
+    chat_id: chatId,
+    user_id: userId,
+    only_if_banned: true,
+  });
+
+  if (!unbanned.ok) {
+    logger.warn(
+      { chatId, event: "telegram.unban_failed", detail: unbanned.error },
+      "Removed the member but could not lift the ban — they cannot rejoin until someone does",
+    );
+  }
+
+  return { ok: true };
+}

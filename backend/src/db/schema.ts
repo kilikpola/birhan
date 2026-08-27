@@ -56,6 +56,12 @@ export const profiles = pgTable("profiles", {
   /** Display convenience only. Telegram usernames change; the id does not. */
   telegramUsername: text("telegram_username"),
   telegramVerifiedAt: timestamp("telegram_verified_at", { withTimezone: true }),
+  /**
+   * Set when the person deletes their account. The row stays — announcements
+   * and replies reference it — but everything identifying is cleared and every
+   * "people in this church" query filters this out. See migration 0008.
+   */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("profiles_church_id_idx").on(table.churchId),
@@ -287,6 +293,21 @@ export const emailVerificationTokens = pgTable("email_verification_tokens", {
 ]);
 
 // Better Auth sessions table
+/**
+ * Tokens that must stop working before they expire on their own.
+ *
+ * Only deleted accounts land here. The JWT carries no server-side state, so
+ * this is the one thing standing between a deleted account and a token that
+ * keeps authenticating for up to 30 days. Read through services/revocation.ts,
+ * which caches it — never per request.
+ */
+export const accountRevocations = pgTable("account_revocations", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }).notNull().defaultNow(),
+  /** revokedAt + the JWT's own lifetime; past this the token is dead anyway. */
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

@@ -7,7 +7,9 @@ import { t } from "@/i18n";
 import { ThemedText } from "@/components/themed-text";
 import { Cross } from "@/components/cross";
 import { Icon } from "@/components/icon";
+import { DeleteAccountModal, DeleteAccountRow } from '../components/settings/delete-account';
 import { Logo } from "@/components/logo";
+import { VerificationStatus } from "@/components/verification-status";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import { radius, space, fonts } from "@/theme/tokens";
@@ -19,9 +21,28 @@ import { getAllowMobileData, setAllowMobileData, isNetworkAllowedForDownload, in
 
 export default function MoreScreen() {
   const { c, night: isNight, setNight, lang: locale, setLang: setLocale } = useApp();
-  const { profile, signOut, isSuperAdmin } = useAuth();
+  const { profile, signOut, isSuperAdmin, resendVerificationEmail, syncVerification } = useAuth();
+  const [showDelete, setShowDelete] = useState(false);
 
   const isAm = locale === "am";
+
+  // Standing reminder for anyone who dismissed the post-signup verification
+  // screen (or restarted the app) before confirming — that screen only shows
+  // once, so this is the only other way back to "resend".
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const handleResendVerification = async () => {
+    setResendState('sending');
+    const res = await resendVerificationEmail();
+    if (res.status === 'sent') {
+      setResendState('sent');
+    } else if (res.status === 'already_verified') {
+      setResendState('sent');
+      syncVerification().catch(() => {});
+    } else {
+      setResendState('error');
+      reportError(new Error(res.message), 'Explore.resendVerification', locale, false);
+    }
+  };
   const toggleTheme = () => setNight(!isNight);
 
   // Seeded churches offline fallback lookup map
@@ -227,6 +248,22 @@ export default function MoreScreen() {
           </View>
         </SectionBoundary>
 
+        {/* Standing email-verification reminder — see resendState above */}
+        {!!profile?.email && !profile.email_verified && (
+          <SectionBoundary name="Explore.VerificationReminder">
+            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 12 }]}>
+              <VerificationStatus
+                c={c}
+                state={resendState === 'sending' ? 'sending' : resendState === 'sent' ? 'sent' : 'unverified'}
+                title={t(locale, 'notVerifiedStatus')}
+                note={resendState === 'sent' ? t(locale, 'resendSentConfirm') : profile.email}
+                actionLabel={resendState === 'sending' ? undefined : t(locale, 'btnResendEmail')}
+                onAction={resendState === 'sending' ? undefined : handleResendVerification}
+              />
+            </View>
+          </SectionBoundary>
+        )}
+
         {/* Path B: Native APK Update Card (if update available) */}
         {apkUpdate?.isUpdateAvailable && (
           <SectionBoundary name="Explore.UpdateCard">
@@ -344,6 +381,17 @@ export default function MoreScreen() {
               </ThemedText>
             </View>
           </Pressable>
+
+          {/* About / credits */}
+          <Pressable
+            onPress={() => router.push('/about' as Href)}
+            style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
+          >
+            <ThemedText type="default" colorType="text" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "500" }}>
+              {t(locale, 'about')}
+            </ThemedText>
+            <Icon name="chev" size={15} color={c.textFaint} />
+          </Pressable>
         </SectionBoundary>
 
         {/* Super-admin: pastor verification queue (Stage 3) */}
@@ -374,6 +422,12 @@ export default function MoreScreen() {
           </View>
         </SectionBoundary>
 
+        {/* Delete Account — sits with the other account-level actions rather
+            than among the display preferences above. */}
+        <SectionBoundary name="Explore.DeleteAccount" fallback={null}>
+          <DeleteAccountRow c={c} lang={locale} onPress={() => setShowDelete(true)} />
+        </SectionBoundary>
+
         {/* Sign Out Button */}
         <SectionBoundary name="Explore.SignOut" fallback={null}>
           <TouchableOpacity
@@ -395,6 +449,19 @@ export default function MoreScreen() {
           </ThemedText>
         </View>
       </ScrollView>
+
+      <DeleteAccountModal
+        visible={showDelete}
+        c={c}
+        lang={locale}
+        onClose={() => setShowDelete(false)}
+        // The token has already been revoked server-side by this point; this
+        // clears the one on disk so the app returns to the login screen.
+        onDeleted={() => {
+          setShowDelete(false);
+          signOut();
+        }}
+      />
     </SafeAreaView>
   );
 }

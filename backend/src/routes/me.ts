@@ -6,8 +6,20 @@ import { profiles, users } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { Errors } from "../utils/errors.js";
 import { normalizePhone } from "../utils/phone.js";
+import { deleteOwnAccount } from "../services/account-deletion.js";
 
 const router = new Hono();
+
+/**
+ * Deletion takes the password again, not just a valid session.
+ *
+ * It is irreversible, and a session alone is whatever is sitting unlocked in
+ * someone's hand. Re-entering the password is the difference between a deletion
+ * and a mis-tap.
+ */
+const deleteMeSchema = z.object({
+  password: z.string().min(1),
+});
 
 const patchMeSchema = z.object({
   displayName: z.string().min(1).optional(),
@@ -74,6 +86,25 @@ router.patch("/", zValidator("json", patchMeSchema), async (c) => {
     .returning();
 
   return c.json(updated);
+});
+
+/**
+ * Deletes the caller's own account. Irreversible.
+ *
+ * DELETE rather than POST because that is what it is, and the password travels
+ * in the body rather than a query string so it stays out of access logs.
+ *
+ * Answers 200 with a per-group report even when Telegram removal failed: the
+ * account is gone either way, and the app needs to be able to say which groups
+ * it could not update rather than implying a reach the bot does not have.
+ */
+router.delete("/", zValidator("json", deleteMeSchema), async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+
+  const { password } = c.req.valid("json");
+  const result = await deleteOwnAccount(ctx, password);
+  return c.json(result);
 });
 
 export default router;

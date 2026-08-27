@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { jwtVerify, importJWK } from "jose";
 import { config } from "../config/index.js";
 import { Errors } from "../utils/errors.js";
+import { isRevoked } from "../services/revocation.js";
 import type { AuthContext, Role } from "../types/index.js";
 
 async function getJwtSecret() {
@@ -30,6 +31,13 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     const branchId = (payload.branch_id as string | null) ?? null;
 
     if (!userId || !churchId || !role) {
+      throw Errors.unauthenticated();
+    }
+
+    // A deleted account's token is still signed and still in date — nothing
+    // about the JWT itself says otherwise. This is the only thing that stops
+    // it. In-memory set, no database read (see services/revocation.ts).
+    if (isRevoked(userId)) {
       throw Errors.unauthenticated();
     }
 
@@ -62,15 +70,20 @@ export const optionalAuthMiddleware = createMiddleware(async (c, next) => {
         clockTolerance: 60,
         maxTokenAge: "30d",
       });
-      const ctx: AuthContext = {
-        userId: payload.user_id as string,
-        churchId: payload.church_id as string,
-        role: payload.role as Role,
-        branchId: (payload.branch_id as string | null) ?? null,
-        email: (payload.email as string | null) ?? null,
-        emailVerified: payload.email_verified === true,
-      };
-      c.set("authContext", ctx);
+      const userId = payload.user_id as string;
+      // Same rule as the required path: a revoked token identifies nobody. An
+      // optional-auth route must not treat a deleted account as signed in.
+      if (!isRevoked(userId)) {
+        const ctx: AuthContext = {
+          userId,
+          churchId: payload.church_id as string,
+          role: payload.role as Role,
+          branchId: (payload.branch_id as string | null) ?? null,
+          email: (payload.email as string | null) ?? null,
+          emailVerified: payload.email_verified === true,
+        };
+        c.set("authContext", ctx);
+      }
     } catch {
       // ignore invalid token for optional auth
     }

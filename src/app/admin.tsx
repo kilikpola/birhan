@@ -14,6 +14,7 @@ import * as DocumentPicker from 'expo-document-picker';
 
 import { useApp } from '../theme/context';
 import { t } from '../i18n';
+import { displayAuthorName } from '../lib/account';
 import { fonts, radius, space } from '../theme/tokens';
 import { useAuth } from '../lib/auth';
 import { apiFetch } from '../lib/api';
@@ -492,7 +493,7 @@ export default function AdminScreen() {
                 replies.map((r) => (
                   <View key={r.id} style={[s.replyCard, { borderLeftColor: colors.border }]}>
                     <View style={s.replyHeader}>
-                      <Text style={[s.replyAuthor, { color: colors.text }]}>{r.author_name}</Text>
+                      <Text style={[s.replyAuthor, { color: colors.text }]}>{displayAuthorName(r.author_name, lang)}</Text>
                       <Pressable onPress={() => handleDeleteReply(r.id)} hitSlop={10}>
                         <Text style={[s.deleteBtnText, { color: colors.danger }]}>
                           {t(lang, 'delete')}

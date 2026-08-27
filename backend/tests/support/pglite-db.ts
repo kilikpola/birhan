@@ -37,8 +37,8 @@ export async function truncateAll() {
   await client.exec(`
     TRUNCATE auth_accounts, auth_verifications, telegram_link_codes,
              pending_registrations, email_verification_tokens, replies,
-             announcements, resources, profiles, branches, churches,
-             sessions, users
+             announcements, resources, account_revocations, profiles,
+             branches, churches, sessions, users
              RESTART IDENTITY CASCADE;
   `);
 }

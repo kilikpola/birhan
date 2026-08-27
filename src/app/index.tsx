@@ -19,6 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 
 import { useApp } from '../theme/context';
 import { t } from '../i18n';
+import { displayAuthorName } from '../lib/account';
 import { fonts, radius, space } from '../theme/tokens';
 import { toEthiopian, formatEthiopian, toGeezNumeral, localeTag } from '../lib/ethiopian';
 import { getLocalDb } from '../utils/db';
@@ -469,7 +470,7 @@ export default function Today() {
                   <View key={r.id} style={[s.reply, { borderLeftColor: c.borderLit }]}>
                     <View style={s.replyHeader}>
                       <Text style={[s.replyAuthor, { color: r.pending ? c.textFaint : c.text }]}>
-                        {r.author_name}
+                        {displayAuthorName(r.author_name, lang)}
                       </Text>
                       {r.pending ? (
                         <Text style={[s.replyPendingText, { color: c.danger }]}>

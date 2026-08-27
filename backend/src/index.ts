@@ -8,6 +8,7 @@ import { logger, requestLogger } from "./middleware/logger.js";
 import { errorHandler } from "./middleware/error.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { rateLimitByIp, rateLimitByUser } from "./middleware/rate-limit.js";
+import { startRevocationRefresh } from "./services/revocation.js";
 
 import authRoutes from "./routes/auth.js";
 import meRoutes from "./routes/me.js";
@@ -78,6 +79,11 @@ app.route("/api/v1/auth", authRoutes);
 
 // Authenticated routes
 app.use("/api/v1/me/*", authMiddleware);
+// Deletion re-checks the password, so it is a password endpoint and gets a
+// password endpoint's budget. Everything else under /me stays unthrottled.
+app.use("/api/v1/me/*", (c, next) =>
+  c.req.method === "DELETE" ? rateLimitByUser(5, 60)(c, next) : next(),
+);
 app.route("/api/v1/me", meRoutes);
 
 app.use("/api/v1/announcements/*", authMiddleware);
@@ -122,6 +128,11 @@ app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
 if (config.nodeEnv !== "test") {
   const port = config.port;
   logger.info(`Server starting on port ${port}`);
+
+  // Load the set of revoked accounts before serving anything. Until this
+  // resolves the set is empty, which would let a deleted account's token
+  // through — a second at boot, but not one worth handing away.
+  void startRevocationRefresh();
 
   serve({ fetch: app.fetch, port }, (info) => {
     logger.info(`Server listening on http://localhost:${info.port}`);
