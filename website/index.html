@@ -3,1171 +3,370 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title data-en="Birhan — your church, offline, in Amharic">ብርሃን · Birhan — ቤተ ክርስቲያንዎ፣ ያለ ኢንተርኔት፣ በአማርኛ</title>
-<meta name="description" data-en="Birhan is an Amharic-first church app: the Bible offline forever, your church's announcements, sermon notes and study guides — on the phone you already own." content="ብርሃን በአማርኛ የተሠራ የቤተ ክርስቲያን መተግበሪያ ነው፦ መጽሐፍ ቅዱስ ያለ ኢንተርኔት፣ የቤተ ክርስቲያንዎ ማስታወቂያዎች፣ የስብከት ማስታወሻዎችና የጥናት መምሪያዎች — በእጅዎ ባለው ስልክ።" />
+<title>ብርሃን · Birhan</title>
+<meta name="description" content="ብርሃን — መጽሐፍ ቅዱስ ያለ ኢንተርኔት፣ የቤተ ክርስቲያንዎ ማስታወቂያዎችና ሰነዶች። Birhan — the Bible offline, your church's announcements and documents. Free, no ads." />
+<meta name="theme-color" content="#0B0B0D" />
 <link rel="icon" type="image/png" href="/assets/favicon.png" />
 <link rel="apple-touch-icon" href="/assets/birhanlogo.png" />
 
 <style>
+  /* Ethiopic, without making anyone pay for it twice.
+     local() comes first, so a phone that already has an Ethiopic font — every
+     current Android, iOS 15 and later — renders Ge'ez from disk and never
+     downloads anything. Only a machine without one fetches the woff2. */
   @font-face {
-    font-family: 'Noto Serif Ethiopic';
-    src: url('/assets/noto-serif-ethiopic.woff2') format('woff2');
-    font-weight: 100 900;
+    font-family: 'Birhan Ethiopic';
+    src: local('Noto Sans Ethiopic'), local('Noto Serif Ethiopic'),
+         local('Abyssinica SIL'), local('Nyala'), local('Kefa'),
+         url('/assets/noto-serif-ethiopic.woff2') format('woff2');
+    unicode-range: U+1200-137F, U+1380-139F, U+2D80-2DDF;
     font-display: swap;
   }
 
   :root {
-    --bg: #08080a;
-    --surface: #0f0f12;
-    --surface-raised: #16161a;
-    --border: #1e1e24;
-    --border-lit: #2a2a32;
-    --text: #f0ece6;
-    --text-soft: #a39e96;
-    --text-faint: #5c5954;
-    --gold: #d4a03c;
-    --gold-dim: #a67c2e;
-    --gold-lit: #f0c96e;
-    --gold-glow: rgba(212, 160, 60, 0.15);
+    /* Straight from the app's own tokens (src/theme/tokens.ts, dark). */
+    --bg:        #0B0B0D;
+    --surface:   #141417;
+    --border:    #26262C;
+    --text:      #F2EFE9;
+    --text-soft: #9B968D;
+    --text-faint:#63605A;
+    --gold:      #E3A93C;
+    --gold-glow: rgba(227,169,60,0.12);
+    --danger:    #D2564B;
     --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-    --serif: 'Noto Serif Ethiopic', Georgia, 'Times New Roman', serif;
-    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-in-out-sine: cubic-bezier(0.37, 0, 0.63, 1);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html {
-    scroll-behavior: smooth;
-  }
-
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: var(--sans);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-    cursor: none;
+    font: 16px/1.6 var(--sans);
+    -webkit-text-size-adjust: 100%;
   }
 
-  html[lang="am"] body { font-family: var(--serif); line-height: 1.9; }
+  /* Ge'ez is tall and dense: it needs roughly 1.9x leading, not the Latin 1.6.
+     Every Amharic block carries lang="am" and gets it. */
+  [lang="am"] {
+    font-family: 'Birhan Ethiopic', var(--sans);
+    line-height: 1.9;
+  }
+  [lang="en"] { line-height: 1.6; }
 
-  ::selection {
-    background: rgba(212, 160, 60, 0.25);
-    color: var(--text);
-  }
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 0 1.25rem; }
 
-  /* Custom Cursor */
-  .cursor {
-    position: fixed;
-    top: 0; left: 0;
-    width: 8px; height: 8px;
-    background: var(--gold);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 9999;
-    mix-blend-mode: difference;
-    transition: transform 0.15s var(--ease-out-expo), width 0.3s, height 0.3s, background 0.3s;
-    transform: translate(-50%, -50%);
+  header { padding: 2.5rem 0 1.5rem; text-align: center; }
+  header img { width: 72px; height: 72px; border-radius: 16px; }
+  header h1 { font-size: 1.9rem; margin-top: .75rem; letter-spacing: -0.01em; }
+  header .latin { color: var(--text-soft); font-size: .95rem; letter-spacing: .28em; }
+
+  nav { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.25rem; }
+  nav a {
+    color: var(--text-soft); text-decoration: none; font-size: .82rem;
+    border: 1px solid var(--border); border-radius: 999px; padding: .35rem .8rem;
   }
-  .cursor.hover {
-    width: 40px; height: 40px;
-    background: transparent;
-    border: 1.5px solid var(--gold);
-    mix-blend-mode: normal;
-  }
-  .cursor-dot {
-    position: fixed;
-    top: 0; left: 0;
-    width: 4px; height: 4px;
-    background: var(--text);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 10000;
-    transform: translate(-50%, -50%);
+  nav a:hover, nav a:focus-visible { color: var(--gold); border-color: var(--gold); }
+
+  section { padding: 2.25rem 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: 0; }
+
+  h2 { font-size: 1.15rem; margin-bottom: .35rem; }
+  h3 { font-size: .95rem; margin: 1.5rem 0 .35rem; }
+  /* Every bilingual heading puts the English on its own line. Without the
+     block here the two languages run together mid-word — "እንሰበሰባለንWhat". */
+  h2 .en, h3 .en {
+    display: block; color: var(--text-soft); font-weight: 500;
+    font-size: .85rem; line-height: 1.5; margin-top: .15rem;
   }
 
-  /* Grain overlay */
-  .grain {
-    position: fixed;
-    inset: 0;
-    z-index: 9998;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 256px 256px;
-  }
-
-  a { color: var(--gold); text-decoration: none; }
-  img { max-width: 100%; display: block; }
-
-  .wrap { max-width: 1020px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 2; }
-
-  /* Loading Screen */
-  .loader {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    z-index: 10001;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 24px;
-    transition: opacity 0.8s var(--ease-out-expo), visibility 0.8s;
-  }
-  .loader.done { opacity: 0; visibility: hidden; pointer-events: none; }
-  .loader-mark {
-    width: 64px; height: 64px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
-    animation: loaderPulse 1.5s ease-in-out infinite;
-    box-shadow: 0 0 60px rgba(212, 160, 60, 0.3);
-  }
-  @keyframes loaderPulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(0.9); opacity: 0.7; }
-  }
-  .loader-text {
-    font-family: var(--serif);
-    color: var(--text-soft);
-    font-size: 14px;
-    letter-spacing: 0.2em;
-  }
-
-  /* Ambient Canvas */
-  #ambient-canvas {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0.6;
-  }
-
-  /* Navigation */
-  header.nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 20px 0;
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    background: rgba(8, 8, 10, 0.7);
-    backdrop-filter: blur(20px) saturate(1.2);
-    -webkit-backdrop-filter: blur(20px) saturate(1.2);
-    z-index: 100;
-    transform: translateY(-100%);
-    animation: navSlideDown 1s var(--ease-out-expo) 0.5s forwards;
-  }
-  @keyframes navSlideDown {
-    to { transform: translateY(0); }
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-    color: var(--text);
-    position: relative;
-  }
-  .brand::after {
-    content: '';
-    position: absolute;
-    inset: -8px -14px;
-    border-radius: 12px;
-    background: radial-gradient(circle at center, var(--gold-glow), transparent 70%);
-    opacity: 0;
-    transition: opacity 0.4s;
-    z-index: -1;
-  }
-  .brand:hover::after { opacity: 1; }
-  .brand img {
-    width: 40px; height: 40px;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    transition: transform 0.5s var(--ease-out-expo), box-shadow 0.5s;
-  }
-  .brand:hover img {
-    transform: scale(1.08) rotate(-3deg);
-    box-shadow: 0 8px 30px rgba(212, 160, 60, 0.2);
-  }
-  .brand .n {
-    font-family: var(--serif);
-    font-weight: 800;
-    font-size: 20px;
-    letter-spacing: -0.02em;
-  }
-
-  .nav-links {
-    display: flex;
-    align-items: center;
-    gap: 28px;
-    font-size: 14px;
-  }
-  .nav-links a {
-    color: var(--text-soft);
-    text-decoration: none;
-    position: relative;
-    padding: 4px 0;
-    transition: color 0.3s;
-  }
-  .nav-links a::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 1.5px;
-    background: var(--gold);
-    transition: width 0.4s var(--ease-out-expo);
-  }
-  .nav-links a:hover {
-    color: var(--text);
-  }
-  .nav-links a:hover::after {
-    width: 100%;
-  }
-
-  #lang-toggle {
-    font-family: var(--sans);
-    background: transparent;
-    color: var(--text-soft);
-    border: 1.5px solid var(--border-lit);
-    border-radius: 999px;
-    padding: 7px 18px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.5;
-    cursor: none;
-    transition: all 0.4s var(--ease-out-expo);
-    position: relative;
-    overflow: hidden;
-  }
-  #lang-toggle[lang="am"] { font-family: var(--serif); }
-  #lang-toggle::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gold);
-    transform: scaleX(0);
-    transform-origin: right;
-    transition: transform 0.5s var(--ease-out-expo);
-    z-index: -1;
-    border-radius: 999px;
-  }
-  #lang-toggle:hover {
-    color: var(--bg);
-    border-color: var(--gold);
-  }
-  #lang-toggle:hover::before {
-    transform: scaleX(1);
-    transform-origin: left;
-  }
-
-  /* Hero */
-  .hero {
-    text-align: center;
-    padding: 100px 0 80px;
-    position: relative;
-    perspective: 1000px;
-  }
-
-  .hero-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(212, 160, 60, 0.08) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-    animation: glowBreathe 6s ease-in-out infinite;
-  }
-  @keyframes glowBreathe {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
-    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
-  }
-
-  .hero img.mark {
-    width: 160px; height: 160px;
-    border-radius: 32px;
-    margin: 0 auto 32px;
-    box-shadow:
-      0 0 0 1px rgba(212, 160, 60, 0.2),
-      0 32px 80px rgba(212, 160, 60, 0.12),
-      0 0 120px rgba(212, 160, 60, 0.06);
-    transition: transform 0.8s var(--ease-out-expo), box-shadow 0.8s;
-    opacity: 0;
-    transform: translateY(40px) scale(0.9);
-    animation: heroMarkIn 1.2s var(--ease-out-expo) 0.8s forwards;
-    position: relative;
-    z-index: 2;
-  }
-  .hero img.mark:hover {
-    transform: scale(1.05) rotate(2deg);
-    box-shadow:
-      0 0 0 1px rgba(212, 160, 60, 0.4),
-      0 40px 100px rgba(212, 160, 60, 0.2),
-      0 0 160px rgba(212, 160, 60, 0.1);
-  }
-  @keyframes heroMarkIn {
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  .hero h1 {
-    font-family: var(--serif);
-    font-size: clamp(44px, 8vw, 72px);
-    line-height: 1.05;
-    margin: 0 0 10px;
-    opacity: 0;
-    transform: translateY(30px);
-    animation: fadeUp 1s var(--ease-out-expo) 1s forwards;
-    position: relative;
-    z-index: 2;
-  }
-  .hero h1 .char {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(40px) rotateX(-40deg);
-    animation: charReveal 0.8s var(--ease-out-expo) forwards;
-  }
-  @keyframes charReveal {
-    to { opacity: 1; transform: translateY(0) rotateX(0); }
-  }
-
-  .hero .latin {
-    font-family: var(--sans);
-    color: var(--text-faint);
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    font-size: 11px;
-    font-weight: 500;
-    opacity: 0;
-    animation: fadeIn 1s ease 1.4s forwards;
-    position: relative;
-    z-index: 2;
-  }
-
-  .hero p.lede {
-    max-width: 600px;
-    margin: 28px auto 0;
-    font-size: clamp(16px, 2.2vw, 19px);
-    color: var(--text-soft);
-    line-height: 1.7;
-    opacity: 0;
-    transform: translateY(20px);
-    animation: fadeUp 1s var(--ease-out-expo) 1.6s forwards;
-    position: relative;
-    z-index: 2;
-  }
-
-  .verse {
-    margin: 36px auto 0;
-    max-width: 600px;
-    font-family: var(--serif);
-    color: var(--gold);
-    font-size: 18px;
-    line-height: 1.8;
-    opacity: 0;
-    animation: fadeUp 1s var(--ease-out-expo) 1.9s forwards;
-    position: relative;
-    z-index: 2;
-  }
-  .verse::before {
-    content: '"';
-    display: block;
-    font-size: 48px;
-    line-height: 1;
-    color: var(--gold-dim);
-    opacity: 0.4;
-    margin-bottom: -10px;
-  }
-  .verse small {
-    display: block;
-    font-family: var(--sans);
-    color: var(--text-faint);
-    font-size: 11px;
-    margin-top: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .cta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    justify-content: center;
-    margin-top: 42px;
-    opacity: 0;
-    animation: fadeUp 1s var(--ease-out-expo) 2.2s forwards;
-    position: relative;
-    z-index: 2;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 15px 28px;
-    border-radius: 14px;
-    font-size: 15px;
-    font-weight: 700;
-    text-decoration: none;
-    border: 1.5px solid transparent;
-    cursor: none;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.4s var(--ease-out-expo), box-shadow 0.4s;
-  }
-  .btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
-    transform: translateX(-100%);
-    transition: transform 0.6s;
-  }
-  .btn:hover::before {
-    transform: translateX(100%);
-  }
-  .btn:hover {
-    transform: translateY(-2px);
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
-    color: #1a1305;
-    box-shadow: 0 8px 32px rgba(212, 160, 60, 0.25), 0 0 0 1px rgba(212, 160, 60, 0.3);
-  }
-  .btn-primary:hover {
-    box-shadow: 0 12px 40px rgba(212, 160, 60, 0.35), 0 0 0 1px rgba(212, 160, 60, 0.5);
-  }
-
-  .btn-ghost {
-    border-color: var(--border-lit);
-    color: var(--text);
-    background: var(--surface);
-    backdrop-filter: blur(10px);
-  }
-  .btn-ghost:hover {
-    border-color: var(--gold);
-    color: var(--gold);
-    background: var(--surface-raised);
-    box-shadow: 0 0 30px rgba(212, 160, 60, 0.08);
-  }
-
-  .apk-note {
-    margin-top: 16px;
-    font-size: 12px;
-    color: var(--text-faint);
-    opacity: 0;
-    animation: fadeIn 1s ease 2.5s forwards;
-    position: relative;
-    z-index: 2;
-  }
-
-  /* Sections */
-  section {
-    padding: 80px 0;
-    border-top: 1px solid var(--border);
-    position: relative;
-  }
-
-  h2 {
-    font-family: var(--sans);
-    font-size: 11px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    font-weight: 700;
-    margin: 0 0 40px;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.8s var(--ease-out-expo), transform 0.8s var(--ease-out-expo);
-  }
-  h2.visible { opacity: 1; transform: translateY(0); }
-  html[lang="am"] h2 {
-    font-family: var(--serif);
-    letter-spacing: 0.15em;
-    text-transform: none;
-    font-size: 13px;
-  }
-
-  .grid {
-    display: grid;
-    gap: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  }
+  p { margin: .5rem 0; }
+  p.am { color: var(--text); }
+  p.en { color: var(--text-soft); font-size: .93rem; }
 
   .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 28px;
-    position: relative;
-    overflow: hidden;
-    opacity: 0;
-    transform: translateY(40px) rotateX(5deg);
-    transition: opacity 0.8s var(--ease-out-expo), transform 0.8s var(--ease-out-expo), border-color 0.4s, box-shadow 0.4s;
-    transform-style: preserve-3d;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.15rem;
   }
-  .card.visible {
-    opacity: 1;
-    transform: translateY(0) rotateX(0);
-  }
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
-    opacity: 0;
-    transition: opacity 0.4s;
-  }
-  .card::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: 20px;
-    padding: 1px;
-    background: linear-gradient(135deg, rgba(212,160,60,0.3), transparent 40%, transparent 60%, rgba(212,160,60,0.1));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0;
-    transition: opacity 0.5s;
-    pointer-events: none;
-  }
-  .card:hover {
-    border-color: var(--border-lit);
-    transform: translateY(-6px) scale(1.01);
-    box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(212,160,60,0.1);
-  }
-  .card:hover::before,
-  .card:hover::after {
-    opacity: 1;
-  }
-  .card .am {
-    font-family: var(--serif);
-    color: var(--gold);
-    font-size: 14px;
-    margin-bottom: 8px;
-    opacity: 0.8;
-  }
-  .card h3 {
-    margin: 0 0 10px;
-    font-size: 18px;
-    font-weight: 700;
-    transition: color 0.3s;
-  }
-  .card:hover h3 {
-    color: var(--gold-lit);
-  }
-  .card p {
-    margin: 0;
-    color: var(--text-soft);
-    font-size: 14.5px;
-    line-height: 1.65;
-  }
-  html[lang="am"] .card .am { display: none; }
+  .card + .card { margin-top: .85rem; }
 
-  .split {
-    display: grid;
-    gap: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* Download */
+  .dl { text-align: center; }
+  .btn {
+    display: block; width: 100%; background: var(--gold); color: #0B0B0D;
+    font-weight: 700; font-size: 1.05rem; text-decoration: none;
+    padding: 1rem 1.25rem; border-radius: 14px; margin: 1rem 0 .5rem;
   }
+  .btn:hover, .btn:focus-visible { filter: brightness(1.08); }
+  .meta { color: var(--text-soft); font-size: .85rem; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .sha { color: var(--text-faint); font-size: .7rem; word-break: break-all; margin-top: .5rem; }
 
-  .who {
-    border-left: 2px solid var(--gold-dim);
-    padding-left: 24px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    opacity: 0;
-    transform: translateX(-20px);
-    transition: all 0.8s var(--ease-out-expo);
-    position: relative;
-  }
-  .who.visible {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  .who::before {
-    content: '';
-    position: absolute;
-    left: -2px; top: 0;
-    width: 2px; height: 0;
-    background: var(--gold);
-    transition: height 1s var(--ease-out-expo);
-  }
-  .who.visible::before {
-    height: 100%;
-  }
-  .who h3 {
-    margin: 0 0 8px;
-    font-size: 17px;
-    font-weight: 700;
-  }
-  .who p {
-    margin: 0;
-    color: var(--text-soft);
-    font-size: 14.5px;
-    line-height: 1.65;
-  }
-  .who a {
-    display: inline-block;
-    margin-top: 12px;
-    font-size: 14px;
-    position: relative;
-  }
-  .who a::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 1px;
-    background: var(--gold);
-    transition: width 0.4s var(--ease-out-expo);
-  }
-  .who a:hover::after {
-    width: 100%;
-  }
+  .warn { border-color: var(--danger); }
+  .warn h3 { color: var(--danger); margin-top: 0; }
 
-  /* Footer */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 40px 0 80px;
-    color: var(--text-faint);
-    font-size: 13px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-    justify-content: space-between;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.8s var(--ease-out-expo);
-  }
-  footer.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .foot-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .foot-brand img {
-    width: 32px; height: 32px;
-    border-radius: 8px;
-    opacity: 0.7;
-    transition: opacity 0.3s, transform 0.3s;
-  }
-  .foot-brand:hover img {
-    opacity: 1;
-    transform: scale(1.1);
-  }
-  footer a {
-    color: var(--text-soft);
-    text-decoration: none;
-    position: relative;
-    transition: color 0.3s;
-  }
-  footer a::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 1px;
-    background: var(--gold);
-    transition: width 0.4s var(--ease-out-expo);
-  }
-  footer a:hover {
-    color: var(--gold);
-  }
-  footer a:hover::after {
-    width: 100%;
-  }
+  ol, ul { margin: .5rem 0 .5rem 1.25rem; }
+  li { margin: .35rem 0; }
 
-  /* Floating orbs */
-  .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(80px);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.4;
-  }
-  .orb-1 {
-    width: 400px; height: 400px;
-    background: rgba(212, 160, 60, 0.06);
-    top: 10%;
-    right: -100px;
-    animation: orbFloat1 20s ease-in-out infinite;
-  }
-  .orb-2 {
-    width: 300px; height: 300px;
-    background: rgba(212, 160, 60, 0.04);
-    bottom: 20%;
-    left: -80px;
-    animation: orbFloat2 25s ease-in-out infinite;
-  }
-  @keyframes orbFloat1 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-30px, 40px) scale(1.1); }
-    66% { transform: translate(20px, -30px) scale(0.9); }
-  }
-  @keyframes orbFloat2 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(40px, -50px) scale(1.15); }
-  }
+  .credit { padding: .8rem 0; border-top: 1px solid var(--border); }
+  .credit:first-of-type { border-top: 0; padding-top: 0; }
+  .credit .name { font-size: .92rem; }
+  .credit .lic { color: var(--gold); font-size: .82rem; }
+  a { color: var(--gold); }
+  a:focus-visible, .btn:focus-visible, nav a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
-  /* Scroll progress */
-  .scroll-progress {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--gold-dim), var(--gold), var(--gold-lit));
-    z-index: 10002;
-    width: 0%;
-    transition: width 0.1s linear;
-  }
-
-  /* Keyframes */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  /* Mobile cursor hide */
-  @media (pointer: coarse) {
-    body { cursor: auto; }
-    .cursor, .cursor-dot { display: none; }
-    .btn, #lang-toggle { cursor: pointer; }
-  }
-
-  @media (max-width: 640px) {
-    .hero { padding: 60px 0 50px; }
-    .nav-links { gap: 16px; }
-    .nav-links a:not(:last-child) { display: none; }
-    section { padding: 50px 0; }
-    .card { padding: 22px; }
-  }
+  footer { padding: 2.5rem 0 3rem; text-align: center; color: var(--text-faint); font-size: .8rem; border-top: 1px solid var(--border); }
 </style>
-<base target="_blank">
 </head>
 <body>
 
-<!-- Loading Screen -->
-<div class="loader" id="loader">
-  <div class="loader-mark"></div>
-  <div class="loader-text">ብርሃን</div>
-</div>
-
-<!-- Scroll Progress -->
-<div class="scroll-progress" id="scroll-progress"></div>
-
-<!-- Custom Cursor -->
-<div class="cursor" id="cursor"></div>
-<div class="cursor-dot" id="cursor-dot"></div>
-
-<!-- Grain Overlay -->
-<div class="grain"></div>
-
-<!-- Ambient Canvas -->
-<canvas id="ambient-canvas"></canvas>
-
-<!-- Floating Orbs -->
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
-
 <div class="wrap">
-  <header class="nav">
-    <a class="brand" href="/">
-      <img src="/assets/birhanlogo.png" alt="ብርሃን · Birhan" />
-      <span class="n">ብርሃን</span>
-    </a>
-    <nav class="nav-links">
-      <a href="#features" data-en="Features">ገጽታዎች</a>
-      <a href="#who" data-en="For churches">ለቤተ ክርስቲያናት</a>
-      <a href="#get" data-en="Download">ያውርዱ</a>
-      <button id="lang-toggle" type="button" aria-label="Switch language">English</button>
+
+  <header>
+    <img src="/assets/birhanlogo.png" alt="" width="72" height="72" />
+    <h1 lang="am">ብርሃን</h1>
+    <div class="latin">BIRHAN</div>
+    <nav>
+      <a href="#download" lang="am">አውርድ · Download</a>
+      <a href="#about" lang="am">ስለ ብርሃን · About</a>
+      <a href="#credits" lang="am">ምንጮች · Credits</a>
+      <a href="#privacy" lang="am">የግላዊነት · Privacy</a>
+      <a href="#contact" lang="am">ያግኙን · Contact</a>
     </nav>
   </header>
 
-  <div class="hero">
-    <div class="hero-glow"></div>
-    <img class="mark" src="/assets/birhanlogo.png" alt="ብርሃን · Birhan" />
-    <h1 id="hero-title">ብርሃን</h1>
-    <div class="latin">Birhan</div>
+  <!-- ================= DOWNLOAD — the reason the site exists ============= -->
+  <section id="download">
+    <h2 lang="am">መተግበሪያውን ያውርዱ<span class="en" lang="en">Download the app</span></h2>
 
-    <p class="lede" data-en="An Amharic-first church app. The Bible stays on your phone — readable with no signal, forever. Your church's announcements, sermon notes, and study guides arrive when you have one.">
-      በአማርኛ የተሠራ የቤተ ክርስቲያን መተግበሪያ። መጽሐፍ ቅዱስ በስልክዎ ውስጥ ይቀመጣል — ያለ ኢንተርኔት፣ ለዘላለም ይነበባል። የቤተ ክርስቲያንዎ ማስታወቂያዎች፣ የስብከት ማስታወሻዎችና የጥናት መምሪያዎች ኢንተርኔት ሲኖር ይደርሳሉ።
-    </p>
-
-    <p class="verse">
-      እግዚአብሔርም። ብርሃን ይሁን ኣለ፤ ብርሃንም ሆነ።
-      <small data-en="And God said, Let there be light: and there was light. — Genesis 1:3">ኦሪት ዘፍጥረት ፩፥፫</small>
-    </p>
-
-    <div class="cta-row">
-      <a class="btn btn-primary" href="/downloads/birhan.apk" data-en="Download for Android">ለአንድሮይድ ያውርዱ</a>
-      <a class="btn btn-ghost" href="#features" data-en="See what it does">ምን እንደሚሠራ ይመልከቱ</a>
+    <div class="card dl">
+      <!-- Never changes, never breaks: the same path the old site served, so
+           links people already have keep working. The version and size beside
+           it come from the update manifest at runtime. -->
+      <a class="btn" href="/downloads/birhan.apk" id="dl-btn">
+        <span lang="am">ብርሃንን አውርድ</span>
+      </a>
+      <p class="meta" id="dl-meta">
+        <span lang="am">የፋይሉ መጠን በመጫን ላይ…</span>
+        <span lang="en">Checking the latest version…</span>
+      </p>
+      <p class="sha" id="dl-sha" hidden></p>
     </div>
-    <p class="apk-note" data-en="Direct APK · Android 7.0+ · allow &quot;install from unknown sources&quot; when prompted">
-      በቀጥታ APK · አንድሮይድ 7.0+ · ሲጠየቁ «ከማይታወቁ ምንጮች መጫን» ይፍቀዱ
-    </p>
-  </div>
 
-  <section id="features">
-    <h2 data-en="What it does">ምን ይሠራል</h2>
-    <div class="grid">
-      <div class="card">
-        <div class="am">መጽሐፍ ቅዱስ</div>
-        <h3 data-en="The Bible, offline forever">መጽሐፍ ቅዱስ ያለ ኢንተርኔት</h3>
-        <p data-en="The full text ships inside the app — no download, no streaming, no signal required — with search built in.">
-          ሙሉ ጽሑፉ በመተግበሪያው ውስጥ ተጭኖ ይመጣል — ማውረድ የለም፣ ኢንተርኔትም አያስፈልግም። ፍለጋም አብሮ አለው።
-        </p>
+    <div class="card warn">
+      <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ<span class="en" lang="en">If you installed an earlier test build</span></h3>
+      <p class="am" lang="am">
+        አንድሮይድ በተለያየ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ከዚህ በፊት የሙከራ (debug) ስሪት ጭነው
+        ከነበረ፣ አዲሱን ከመጫንዎ በፊት አሮጌውን <b>ማራገፍ (uninstall)</b> አለብዎት። አለበለዚያ
+        “App not installed” የሚል መልእክት ይመጣል።
+      </p>
+      <p class="en" lang="en">
+        Android refuses to update an app signed with a different key. If you have
+        an older debug-signed build, you must <b>uninstall it first</b> — otherwise
+        the install fails with “App not installed”. Your Bible reading works
+        offline either way; only your sign-in is lost, and you can sign back in.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 lang="am">እንዴት እንደሚጭኑ<span class="en" lang="en">How to install</span></h3>
+      <ol lang="am">
+        <li>ከላይ ያለውን የማውረጃ ቁልፍ ይጫኑ።</li>
+        <li>ማውረዱ ሲጨርስ ፋይሉን ይክፈቱ።</li>
+        <li>አንድሮይድ ፈቃድ ሲጠይቅ <b>“ከማይታወቁ ምንጮች መጫን ፍቀድ”</b> የሚለውን ያብሩ። ብርሃን በ Play Store ላይ ስለሌለ ይህ ያስፈልጋል።</li>
+        <li><b>ጫን (Install)</b> የሚለውን ይጫኑ።</li>
+      </ol>
+      <ul lang="en" class="en">
+        <li>Tap the download button above.</li>
+        <li>Open the file when the download finishes.</li>
+        <li>When Android asks, allow <b>“install from unknown sources”</b> — Birhan is not on the Play Store, so this is required.</li>
+        <li>Tap <b>Install</b>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= ABOUT ============================================= -->
+  <section id="about">
+    <h2 lang="am">ስለ ብርሃን<span class="en" lang="en">About Birhan</span></h2>
+    <p class="am" lang="am">
+      ብርሃን ለኢትዮጵያ አብያተ ክርስቲያናት የተሠራ መተግበሪያ ነው። መጽሐፍ ቅዱስ ሙሉ በሙሉ ያለ ኢንተርኔት
+      ይሠራል፤ ከዚያም ጎን ለጎን የቤተ ክርስቲያንዎን ማስታወቂያዎችና ሰነዶች በአንድ ቦታ ያገኛሉ።
+    </p>
+    <p class="am" lang="am">
+      ብርሃን ነጻ ነው። ማስታወቂያ የለውም፣ የደንበኝነት ክፍያም የለውም።
+    </p>
+    <p class="en" lang="en">
+      Birhan is an app for Ethiopian churches. The Bible works completely offline,
+      alongside your church's announcements and documents in one place.
+    </p>
+    <p class="en" lang="en">
+      Birhan is free. No ads, no subscriptions.
+    </p>
+  </section>
+
+  <!-- ================= CREDITS — an obligation, not decoration =========== -->
+  <section id="credits">
+    <h2 lang="am">ምንጮች እና ፈቃዶች<span class="en" lang="en">Sources &amp; licences</span></h2>
+    <p class="am" lang="am">ይህ መተግበሪያ ከሚከተሉት ክፍት ምንጮች የተውጣጡ ጽሑፎችን ይጠቀማል፦</p>
+    <p class="en" lang="en">This app uses text from the following open sources:</p>
+
+    <div class="card">
+      <div class="credit">
+        <div class="name">King James Version (1611)</div>
+        <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
+          <a href="https://en.wikipedia.org/wiki/King_James_Version#Copyright_status" rel="noopener">status</a></div>
       </div>
-      <div class="card">
-        <div class="am">ዛሬ</div>
-        <h3 data-en="Today">ዛሬ</h3>
-        <p data-en="A verse of the day, the Ethiopian calendar date, and every announcement your church posts — with replies, so questions get answered once instead of ten times.">
-          የዕለቱ ቃል፣ የኢትዮጵያ ቀን መቁጠሪያ ቀን፣ እና ቤተ ክርስቲያንዎ የሚለጥፈው እያንዳንዱ ማስታወቂያ — መልስ መስጠት ስለሚቻል አንድ ጥያቄ አንድ ጊዜ ይመለሳል።
-        </p>
+      <div class="credit">
+        <div class="name">OpenBible.info Cross References</div>
+        <div class="lic">CC-BY 4.0 ·
+          <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">licence</a> ·
+          <a href="https://www.openbible.info/labs/cross-references/" rel="noopener">source</a></div>
       </div>
-      <div class="card">
-        <div class="am">ሀብቶች</div>
-        <h3 data-en="Resources">ሀብቶች</h3>
-        <p data-en="Sermon notes, study guides, calendars, and announcement documents your pastor uploads, filed by category and readable on the phone.">
-          እረኛዎ የሚሰቅላቸው የስብከት ማስታወሻዎች፣ የጥናት መምሪያዎች፣ የቀን መቁጠሪያዎችና ሰነዶች — በምድብ ተለይተው በስልክዎ ይነበባሉ።
-        </p>
+      <div class="credit">
+        <div class="name">Strong's Hebrew &amp; Greek Dictionaries (Open Scriptures)</div>
+        <div class="lic">CC-BY-SA 3.0 ·
+          <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noopener">licence</a> ·
+          <a href="https://github.com/openscriptures/strongs" rel="noopener">source</a></div>
       </div>
-      <div class="card">
-        <div class="am">ቤተ ክርስቲያን</div>
-        <h3 data-en="Your actual church">የራስዎ ቤተ ክርስቲያን</h3>
-        <p data-en="Join a church and its branch, and you see that congregation's posts — not a generic feed. Pastors are verified before they can post.">
-          ቤተ ክርስቲያንዎንና ቅርንጫፍዎን ይቀላቀሉ፤ የዚያ ጉባኤ ልጥፎች ብቻ ይታዩዎታል — የጋራ ዝርዝር አይደለም። እረኞች ከመለጠፋቸው በፊት ማረጋገጫ ያልፋሉ።
-        </p>
+      <div class="credit">
+        <div class="name">Matthew Henry's Concise Commentary (CrossWire SWORD)</div>
+        <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
+          <a href="https://crosswire.org/sword/modules/ModInfo.jsp?modName=MHCC" rel="noopener">source</a></div>
       </div>
-      <div class="card">
-        <div class="am">ቴሌግራም</div>
-        <h3 data-en="Telegram, still included">ቴሌግራምም አብሮ አለ</h3>
-        <p data-en="An announcement can mirror to the church's Telegram group in the same action, so the people who never leave Telegram still get it.">
-          ማስታወቂያው በአንድ ጊዜ ወደ ቤተ ክርስቲያኑ የቴሌግራም ቡድን አብሮ ሊላክ ይችላል፤ ስለዚህ በቴሌግራም ብቻ ያሉ ሰዎችም ይደርሳቸዋል።
-        </p>
-      </div>
-      <div class="card">
-        <div class="am">አማርኛ</div>
-        <h3 data-en="Amharic first, English second">አማርኛ መጀመሪያ፣ እንግሊዝኛ ሁለተኛ</h3>
-        <p data-en="Amharic typography and interface throughout, with an English toggle — not an English app with Amharic bolted on.">
-          ከጫፍ እስከ ጫፍ በአማርኛ ፊደልና ንድፍ፣ ከእንግሊዝኛ መቀየሪያ ጋር — በአማርኛ የተለጠፈ የእንግሊዝኛ መተግበሪያ አይደለም።
-        </p>
+      <div class="credit">
+        <div class="name">HistoricalChristianFaith / Commentaries-Database (Church Fathers)</div>
+        <div class="lic"><span lang="am">የህዝብ ንብረት ውክልና</span> · Public domain dedication ·
+          <a href="https://github.com/HistoricalChristianFaith/Commentaries-Database" rel="noopener">source</a></div>
       </div>
     </div>
   </section>
 
-  <section id="who">
-    <h2 data-en="Who it's for">ለማን ነው</h2>
-    <div class="split">
-      <div class="who">
-        <h3 data-en="Members">አባላት</h3>
-        <p data-en="Install, join your church, read. Sign in once — the app remembers you offline, so Scripture opens on a dead network.">
-          ይጫኑ፣ ቤተ ክርስቲያንዎን ይቀላቀሉ፣ ያንብቡ። አንድ ጊዜ ይግቡ — መተግበሪያው ያለ ኢንተርኔት ያስታውስዎታል፤ ስለዚህ ኔትወርክ ባይኖርም መጽሐፍ ቅዱስ ይከፈታል።
-        </p>
-      </div>
-      <div class="who">
-        <h3 data-en="Pastors">እረኞች</h3>
-        <p data-en="Apply from inside the app, get verified, then post announcements and upload resources to your congregation from your phone.">
-          ከመተግበሪያው ውስጥ ያመልክቱ፣ ይረጋገጡ፣ ከዚያም ከስልክዎ ለጉባኤዎ ማስታወቂያ ይለጥፉ፤ ሀብቶችንም ይስቀሉ።
-        </p>
-      </div>
-      <div class="who">
-        <h3 data-en="Administrators">አስተዳዳሪዎች</h3>
-        <p data-en="A separate web console handles pastor verification and the church directory.">
-          የእረኞችን ማረጋገጫና የቤተ ክርስቲያናት መዝገብ የሚይዝ የተለየ የድር ኮንሶል አለ።
-        </p>
-        <p style="margin-top:10px">
-          <a href="https://admin.birhan.online" data-en="Open the admin console →">የአስተዳደር ኮንሶል ይክፈቱ →</a>
-        </p>
-      </div>
-    </div>
+  <!-- ================= PRIVACY ========================================== -->
+  <section id="privacy">
+    <h2 lang="am">የግላዊነት መግለጫ<span class="en" lang="en">Privacy</span></h2>
+
+    <h3 lang="am">ምን እንሰበስባለን<span class="en" lang="en">What we collect</span></h3>
+    <p class="am" lang="am">
+      ስምዎን፣ የመረጡትን ቤተ ክርስቲያንና ቅርንጫፍ፣ እና በቤተ ክርስቲያኑ ውስጥ ያለዎትን ድርሻ። ኢሜይል ወይም
+      ስልክ ቁጥር — ቢያንስ አንዱ ያስፈልጋል። መለያዎን ሲከፍቱ የቴሌግራም መለያዎን እናረጋግጣለን፤ ይህም እርስዎ
+      እውነተኛ ሰው መሆንዎን ለማወቅ ነው።
+    </p>
+    <p class="en" lang="en">
+      Your name, the church and branch you choose, and your role in that church.
+      An email address or a phone number — at least one is required. When you
+      register we confirm your Telegram account, to establish that you are a real
+      person.
+    </p>
+
+    <h3 lang="am">ማን ሊያየው ይችላል<span class="en" lang="en">Who can see it</span></h3>
+    <p class="am" lang="am">
+      የአባልነት መረጃዎ የሚታየው በራስዎ ቤተ ክርስቲያን ውስጥ ብቻ ነው። ሌሎች አብያተ ክርስቲያናት ሊያዩት
+      አይችሉም። ብርሃን መረጃዎን አይሸጥም፣ ለማስታወቂያም አይጠቀምበትም። የክትትል መሣሪያ የለም።
+    </p>
+    <p class="en" lang="en">
+      Your membership details are visible only within your own church. Other
+      churches cannot see them. Birhan does not sell your data or use it for
+      advertising, and there are no trackers.
+    </p>
+    <p class="en" lang="en">
+      This matters more than usual: this data says which church you belong to,
+      and therefore something about your religious affiliation. It is treated
+      accordingly.
+    </p>
+
+    <h3 lang="am">መለያዎን መሰረዝ<span class="en" lang="en">Deleting your account</span></h3>
+    <p class="am" lang="am">
+      በመተግበሪያው ውስጥ <b>ተጨማሪ → ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
+      ከሚያስተዳድራቸው የቤተ ክርስቲያን ቴሌግራም ቡድኖች ይወጣሉ። ያለፉ መልሶችዎ ይቀራሉ፣ ነገር ግን ስምዎ
+      ተነስቶ “የተሰረዘ ተጠቃሚ” ተብሎ ይታያል። ይህ የማይቀለበስ ነው።
+    </p>
+    <p class="en" lang="en">
+      In the app, go to <b>More → Settings → Delete my account</b>. Your account is
+      deleted and you are removed from the church Telegram groups Birhan manages.
+      Past replies stay, with your name taken off them and shown as “Deleted
+      user”, so conversations still make sense. This cannot be undone.
+    </p>
   </section>
 
-  <section id="get">
-    <h2 data-en="Get it">ያግኙት</h2>
-    <div class="cta-row" style="justify-content:flex-start">
-      <a class="btn btn-primary" href="/downloads/birhan.apk" data-en="Download the APK">የAPK ፋይል ያውርዱ</a>
-    </div>
-    <p class="apk-note" style="text-align:left; margin-top:16px;" data-en="Android only for now. Open the file after it downloads and approve the install prompt.">
-      ለጊዜው ለአንድሮይድ ብቻ። ፋይሉ ከወረደ በኋላ ይክፈቱት እና የመጫን ጥያቄውን ይፍቀዱ።
+  <!-- ================= CONTACT ========================================== -->
+  <section id="contact">
+    <h2 lang="am">ያግኙን<span class="en" lang="en">Contact</span></h2>
+    <p class="am" lang="am">
+      ቤተ ክርስቲያንዎን ወደ ብርሃን ማከል ከፈለጉ፣ ወይም ማንኛውም ጥያቄ ካለዎት፣ ይጻፉልን፦
     </p>
+    <p class="en" lang="en">
+      To add your church to Birhan, or with any question, write to us:
+    </p>
+    <p><a href="mailto:hello@birhan.online">hello@birhan.online</a></p>
   </section>
 
   <footer>
-    <div class="foot-brand">
-      <img src="/assets/birhanlogo.png" alt="ብርሃን · Birhan" />
-      <span>ብርሃን · Birhan</span>
-    </div>
-    <div>
-      <a href="/downloads/birhan.apk" data-en="Download">ያውርዱ</a> ·
-      <a href="https://admin.birhan.online" data-en="Admin">አስተዳደር</a>
-    </div>
+    <p lang="am">ብርሃን · Birhan</p>
+    <p lang="en">Made in Ethiopia. Free, no ads, no subscriptions.</p>
   </footer>
+
 </div>
 
 <script>
-(function() {
-  'use strict';
+/* The only script on the page.
+ *
+ * Fills in the version and the download size from the update manifest, so this
+ * page cannot go stale the way a hardcoded "v1.0.4 — 148 MB" would. The button
+ * above already works without it: the href is a real, unchanging path, and
+ * everything here only adds detail beside it.
+ *
+ * Order matters. Same-origin first, because it needs no CORS and is deployed
+ * alongside the very APK it describes. The canonical manifest on
+ * updates.birhan.online is the fallback, and reaching it needs
+ * Access-Control-Allow-Origin on that host.
+ */
+(function () {
+  var SOURCES = [
+    '/latest.json',
+    'https://updates.birhan.online/birhan/latest.json'
+  ];
 
-  // ===== Loading Screen =====
-  window.addEventListener('load', function() {
-    setTimeout(function() {
-      document.getElementById('loader').classList.add('done');
-    }, 1200);
-  });
+  var meta = document.getElementById('dl-meta');
+  var shaEl = document.getElementById('dl-sha');
 
-  // ===== Custom Cursor =====
-  const cursor = document.getElementById('cursor');
-  const cursorDot = document.getElementById('cursor-dot');
-  let mouseX = 0, mouseY = 0;
-  let cursorX = 0, cursorY = 0;
-  let dotX = 0, dotY = 0;
+  function mb(bytes) {
+    return (bytes / 1048576).toFixed(0);
+  }
 
-  if (window.matchMedia('(pointer: fine)').matches) {
-    document.addEventListener('mousemove', function(e) {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
+  function render(m) {
+    var bits = [];
+    if (m.versionName) bits.push('v' + m.versionName);
+    if (m.sizeBytes) bits.push(mb(m.sizeBytes) + ' MB');
+    if (!bits.length) return false;
 
-    function animateCursor() {
-      cursorX += (mouseX - cursorX) * 0.15;
-      cursorY += (mouseY - cursorY) * 0.15;
-      dotX += (mouseX - dotX) * 0.35;
-      dotY += (mouseY - dotY) * 0.35;
-      cursor.style.left = cursorX + 'px';
-      cursor.style.top = cursorY + 'px';
-      cursorDot.style.left = dotX + 'px';
-      cursorDot.style.top = dotY + 'px';
-      requestAnimationFrame(animateCursor);
+    // Size before the tap, in MB, every time — the same data-cost discipline
+    // the app itself applies before it downloads anything.
+    meta.innerHTML =
+      '<span lang="am">መጠን፡ <b>' + bits.join(' · ') + '</b></span><br>' +
+      '<span lang="en">Version and size: <b>' + bits.join(' · ') + '</b></span>';
+
+    if (m.sha256) {
+      shaEl.textContent = 'SHA-256 ' + m.sha256;
+      shaEl.hidden = false;
     }
-    animateCursor();
-
-    const interactives = document.querySelectorAll('a, button, .card');
-    interactives.forEach(function(el) {
-      el.addEventListener('mouseenter', function() { cursor.classList.add('hover'); });
-      el.addEventListener('mouseleave', function() { cursor.classList.remove('hover'); });
-    });
+    return true;
   }
 
-  // ===== Ambient Canvas (Golden Dust) =====
-  const canvas = document.getElementById('ambient-canvas');
-  const ctx = canvas.getContext('2d');
-  let particles = [];
-  const PARTICLE_COUNT = 60;
-
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
-
-  class Particle {
-    constructor() {
-      this.reset();
-    }
-    reset() {
-      this.x = Math.random() * canvas.width;
-      this.y = Math.random() * canvas.height;
-      this.size = Math.random() * 2 + 0.5;
-      this.speedX = (Math.random() - 0.5) * 0.3;
-      this.speedY = (Math.random() - 0.5) * 0.3;
-      this.opacity = Math.random() * 0.5 + 0.1;
-      this.life = Math.random() * 100 + 100;
-      this.maxLife = this.life;
-    }
-    update() {
-      this.x += this.speedX;
-      this.y += this.speedY;
-      this.life--;
-      if (this.life <= 0 || this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
-        this.reset();
-      }
-    }
-    draw() {
-      const fade = this.life / this.maxLife;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(212, 160, 60, ' + (this.opacity * fade) + ')';
-      ctx.fill();
-    }
+  function fallback() {
+    meta.innerHTML =
+      '<span lang="am">የፋይሉን መጠን ማወቅ አልተቻለም። ማውረዱ ግን ይሠራል።</span><br>' +
+      '<span lang="en">Could not check the version right now — the download still works.</span>';
   }
 
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    particles.push(new Particle());
+  function tryNext(i) {
+    if (i >= SOURCES.length) return fallback();
+    fetch(SOURCES[i], { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (m) { if (!render(m)) return Promise.reject(); })
+      .catch(function () { tryNext(i + 1); });
   }
 
-  function animateParticles() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    particles.forEach(function(p) {
-      p.update();
-      p.draw();
-    });
-    requestAnimationFrame(animateParticles);
-  }
-  animateParticles();
-
-  // ===== Scroll Progress =====
-  const scrollProgress = document.getElementById('scroll-progress');
-  window.addEventListener('scroll', function() {
-    const scrollTop = window.scrollY;
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const progress = (scrollTop / docHeight) * 100;
-    scrollProgress.style.width = progress + '%';
-  });
-
-  // ===== Intersection Observer for Reveals =====
-  const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
-  };
-
-  const revealObserver = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        // Stagger children if grid
-        const cards = entry.target.querySelectorAll('.card');
-        cards.forEach(function(card, i) {
-          setTimeout(function() {
-            card.classList.add('visible');
-          }, i * 100);
-        });
-        const whos = entry.target.querySelectorAll('.who');
-        whos.forEach(function(who, i) {
-          setTimeout(function() {
-            who.classList.add('visible');
-          }, i * 150);
-        });
-      }
-    });
-  }, observerOptions);
-
-  document.querySelectorAll('section h2, footer').forEach(function(el) {
-    revealObserver.observe(el);
-  });
-  document.querySelectorAll('.grid, .split').forEach(function(el) {
-    revealObserver.observe(el);
-  });
-
-  // ===== Magnetic Buttons =====
-  if (window.matchMedia('(pointer: fine)').matches) {
-    document.querySelectorAll('.btn').forEach(function(btn) {
-      btn.addEventListener('mousemove', function(e) {
-        const rect = btn.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        btn.style.transform = 'translate(' + (x * 0.2) + 'px, ' + (y * 0.2) + 'px) translateY(-2px)';
-      });
-      btn.addEventListener('mouseleave', function() {
-        btn.style.transform = '';
-      });
-    });
-  }
-
-  // ===== 3D Tilt on Cards =====
-  if (window.matchMedia('(pointer: fine)').matches) {
-    document.querySelectorAll('.card').forEach(function(card) {
-      card.addEventListener('mousemove', function(e) {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        const rotateX = (y - centerY) / 10;
-        const rotateY = (centerX - x) / 10;
-        card.style.transform = 'perspective(1000px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) translateY(-6px) scale(1.01)';
-      });
-      card.addEventListener('mouseleave', function() {
-        card.style.transform = '';
-      });
-    });
-  }
-
-  // ===== Hero Title Character Animation =====
-  const heroTitle = document.getElementById('hero-title');
-  const titleText = heroTitle.textContent;
-  heroTitle.innerHTML = '';
-  titleText.split('').forEach(function(char, i) {
-    const span = document.createElement('span');
-    span.className = 'char';
-    span.textContent = char === ' ' ? ' ' : char;
-    span.style.animationDelay = (1.1 + i * 0.08) + 's';
-    heroTitle.appendChild(span);
-  });
-
-  // ===== Language Toggle (preserved from original) =====
-  var STORE_KEY = 'birhan-lang';
-  var html = document.documentElement;
-  var toggle = document.getElementById('lang-toggle');
-  var nodes = document.querySelectorAll('[data-en]');
-
-  nodes.forEach(function(el) {
-    if (el.tagName === 'META') el.dataset.am = el.getAttribute('content');
-    else el.dataset.am = el.textContent.trim();
-  });
-
-  function apply(lang) {
-    html.setAttribute('lang', lang);
-    nodes.forEach(function(el) {
-      var text = lang === 'en' ? el.dataset.en : el.dataset.am;
-      if (el.tagName === 'META') el.setAttribute('content', text);
-      else el.textContent = text;
-    });
-    toggle.textContent = lang === 'en' ? 'አማርኛ' : 'English';
-    toggle.setAttribute('lang', lang === 'en' ? 'am' : 'en');
-  }
-
-  var q = null;
-  try { q = new URLSearchParams(location.search).get('lang'); } catch (e) {}
-  var stored = null;
-  try { stored = localStorage.getItem(STORE_KEY); } catch (e) {}
-  var initial = (q === 'en' || q === 'am') ? q
-              : (stored === 'en' || stored === 'am') ? stored
-              : null;
-  if (initial) apply(initial);
-
-  toggle.addEventListener('click', function() {
-    var next = html.getAttribute('lang') === 'en' ? 'am' : 'en';
-    apply(next);
-    try { localStorage.setItem(STORE_KEY, next); } catch (e) {}
-  });
-
-  // ===== Smooth Scroll for Anchor Links =====
-  document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
-    anchor.addEventListener('click', function(e) {
-      e.preventDefault();
-      const target = document.querySelector(this.getAttribute('href'));
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    });
-  });
-
+  tryNext(0);
 })();
 </script>
 
