@@ -33,6 +33,7 @@ const schema = await import("../src/db/schema.js");
 const { default: app } = await import("../src/index.js");
 const { signRequest } = await import("../src/services/mail-transport.js");
 const { eq } = await import("drizzle-orm");
+const { registerAccount } = await import("./support/register.js");
 
 // ---------------------------------------------------------------------------
 // A stand-in for send.php
@@ -153,16 +154,15 @@ let signupSeq = 0;
 
 async function signup(overrides: Json = {}) {
   signupSeq += 1;
-  return call("/api/v1/auth/signup", {
-    method: "POST",
-    body: {
-      email: `member${signupSeq}@example.com`,
-      password: "a-good-long-password",
-      displayName: `Member ${signupSeq}`,
-      churchId,
-      language: "am",
-      ...overrides,
-    },
+  // Three steps now — see tests/support/register.ts. This suite is about what
+  // leaves through the mail endpoint, not about how the account came to exist.
+  return registerAccount(call, {
+    email: `member${signupSeq}@example.com`,
+    password: "a-good-long-password",
+    displayName: `Member ${signupSeq}`,
+    churchId,
+    language: "am",
+    ...overrides,
   });
 }
 

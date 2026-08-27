@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import { config, telegramEnabled } from "../config/index.js";
 import { logger } from "../middleware/logger.js";
 import { redeemTelegramLinkCode } from "../services/telegram.js";
+import { confirmTelegramForRegistration } from "../services/telegram-signup.js";
 import { sendTelegramMessage, escapeTelegramHtml } from "../services/telegram-api.js";
 
 /**
@@ -34,7 +35,7 @@ interface TelegramUpdate {
   message?: {
     text?: string;
     chat?: { id?: number | string; type?: string; title?: string };
-    from?: { id?: number | string; is_bot?: boolean };
+    from?: { id?: number | string; is_bot?: boolean; username?: string };
   };
 }
 
@@ -64,6 +65,64 @@ function extractCode(text: string): ExtractedCode | null {
   const candidate = withoutCommand.trim().toUpperCase();
   return /^[A-Z0-9]{6}$/.test(candidate) ? { code: candidate, explicit } : null;
 }
+
+/**
+ * Pulls a registration token out of `/start <token>`.
+ *
+ * Telegram sends this itself when someone opens a `?start=` deep link, so
+ * unlike the group code there is no human typing and no lenient parsing to do:
+ * either it is the command with a payload, or it is not ours.
+ *
+ * A bare `/start` with no payload is someone opening the bot directly. That is
+ * not an error and gets a greeting, not a refusal.
+ */
+function extractStartPayload(text: string): { payload: string | null } | null {
+  const trimmed = text.trim();
+  const m = /^\/start(?:@\w+)?(?:\s+(\S+))?$/i.exec(trimmed);
+  if (!m) return null;
+  return { payload: m[1] ?? null };
+}
+
+/**
+ * What the bot says in a one-to-one chat during registration.
+ *
+ * Warm rather than procedural: someone reaches this because they are part way
+ * through joining their church's app, not because they did something wrong.
+ */
+const REGISTRATION_REPLIES: Record<string, { am: string; en: string }> = {
+  confirmed: {
+    am: "እናመሰግናለን %1። ተረጋግጧል — ወደ ብርሃን ተመልሰው ምዝገባዎን ይጨርሱ።",
+    en: "Thank you, %1. You're confirmed — head back to Birhan and finish signing up.",
+  },
+  greeting: {
+    am: "ሰላም! ይህ የብርሃን ቦት ነው። ምዝገባ ለመጀመር በመተግበሪያው ውስጥ ያለውን አገናኝ ይጠቀሙ።",
+    en: "Hello! This is the Birhan bot. To register, use the link inside the Birhan app.",
+  },
+  unknown_token: {
+    am: "ይህ አገናኝ አልታወቀም። እባክዎ በመተግበሪያው ውስጥ ምዝገባውን እንደገና ይጀምሩ።",
+    en: "That link was not recognised. Please start registration again in the Birhan app.",
+  },
+  expired: {
+    am: "የምዝገባው ጊዜ አልፎበታል። እባክዎ በመተግበሪያው ውስጥ እንደገና ይጀምሩ።",
+    en: "That registration expired. Please start again in the Birhan app.",
+  },
+  used: {
+    am: "ይህ አገናኝ ቀደም ሲል ጥቅም ላይ ውሏል። እባክዎ በመተግበሪያው ውስጥ እንደገና ይጀምሩ።",
+    en: "That link has already been used. Please start again in the Birhan app.",
+  },
+  already_confirmed: {
+    am: "አስቀድሞ ተረጋግጧል። ወደ ብርሃን ተመልሰው ምዝገባዎን ይጨርሱ።",
+    en: "Already confirmed. Head back to Birhan and finish signing up.",
+  },
+  not_private: {
+    am: "ምዝገባ በዚህ የግል ውይይት ውስጥ ብቻ ይሠራል፣ በቡድን ውስጥ አይደለም።",
+    en: "Registration only works here in a private chat, not in a group.",
+  },
+  telegram_taken: {
+    am: "ይህ የቴሌግራም መለያ አስቀድሞ ከሌላ የብርሃን መለያ ጋር ተገናኝቷል።",
+    en: "This Telegram account is already connected to a Birhan account.",
+  },
+};
 
 const REPLIES: Record<string, { am: string; en: string }> = {
   linked: {
@@ -121,10 +180,40 @@ router.post("/", async (c) => {
   // Bots posting codes at each other is not a flow worth supporting.
   if (message?.from?.is_bot) return c.json({ ok: true });
 
+  const chatId = String(chat.id);
+
+  // Registration first: `/start` is unambiguous, and its payload could never be
+  // mistaken for a six-character group code.
+  const start = extractStartPayload(text);
+  if (start) {
+    // No payload — someone opened the bot directly rather than through a link.
+    if (!start.payload) {
+      const greeting = REGISTRATION_REPLIES.greeting;
+      await sendTelegramMessage(chatId, `${greeting.am}\n\n${greeting.en}`);
+      return c.json({ ok: true });
+    }
+
+    const fromId = message?.from?.id;
+    if (fromId == null) return c.json({ ok: true });
+
+    const outcome = await confirmTelegramForRegistration({
+      payload: start.payload,
+      telegramUserId: String(fromId),
+      telegramUsername: message?.from?.username ?? null,
+      chatType: chat.type,
+    });
+
+    const copy = REGISTRATION_REPLIES[outcome.status] ?? REGISTRATION_REPLIES.unknown_token;
+    const who = outcome.status === "confirmed" ? outcome.displayName : "";
+    const fillReg = (template: string) =>
+      template.replace("%1", () => escapeTelegramHtml(who));
+    await sendTelegramMessage(chatId, `${fillReg(copy.am)}\n\n${fillReg(copy.en)}`);
+    return c.json({ ok: true });
+  }
+
   const extracted = extractCode(text);
   if (!extracted) return c.json({ ok: true });
 
-  const chatId = String(chat.id);
   const outcome = await redeemTelegramLinkCode({
     code: extracted.code,
     chatId,

@@ -28,6 +28,8 @@ const schema = await import("../src/db/schema.js");
 const { default: app } = await import("../src/index.js");
 const { renderVerificationEmail } = await import("../src/services/email.js");
 const { issueToken, parseToken, verifierMatches } = await import("../src/utils/tokens.js");
+const { registerAccount, startRegistration, confirmTelegram, completeSignup } =
+  await import("./support/register.js");
 
 // The auth routes are rate limited per IP per path, and the limiter's store is
 // module state that outlives a test. A distinct address per request keeps the
@@ -88,7 +90,9 @@ async function signup(overrides: Json = {}) {
     ...overrides,
   };
   for (const key of Object.keys(body)) if (body[key] === undefined) delete body[key];
-  return call("/api/v1/auth/signup", { method: "POST", body });
+  // Signup is a three-step flow now — see tests/support/register.ts. Nothing in
+  // this suite is about Telegram, so the helper drives all three.
+  return registerAccount(call, body);
 }
 
 /** An announcement to reply to. Written straight to the database. */
@@ -197,16 +201,14 @@ describe("signup is one transaction", () => {
   });
 
   it("accepts the snake_case field names from the spec", async () => {
-    const res = await call("/api/v1/auth/signup", {
-      method: "POST",
-      body: {
-        email: "snake@example.com",
-        password: "a-good-long-password",
-        display_name: "Snake Case",
-        church_id: churchId,
-        church_role: "elder",
-        language: "en",
-      },
+    // The snake_case spelling is accepted where the details are now submitted.
+    const res = await registerAccount(call, {
+      email: "snake@example.com",
+      password: "a-good-long-password",
+      display_name: "Snake Case",
+      church_id: churchId,
+      church_role: "elder",
+      language: "en",
     });
     expect(res.status).toBe(200);
 

@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { users, profiles, churches, branches } from "../db/schema.js";
-import { and, eq } from "drizzle-orm";
+import { users, profiles, churches, branches, pendingRegistrations } from "../db/schema.js";
+import { and, eq, isNull } from "drizzle-orm";
 import { resolveUserByIdentifier } from "../auth/index.js";
-import { config } from "../config/index.js";
+import { config, telegramSignupEnabled } from "../config/index.js";
 import { normalizePhone } from "../utils/phone.js";
 import { Errors } from "../utils/errors.js";
 import { SignJWT, jwtVerify } from "jose";
@@ -19,6 +19,10 @@ import {
   verificationLink,
   verifyEmailToken,
 } from "../services/email-verification.js";
+import {
+  getPendingRegistrationStatus,
+  startPendingRegistration,
+} from "../services/telegram-signup.js";
 
 const router = new Hono();
 
@@ -56,6 +60,24 @@ const signupSchema = z
   })
   .refine((d) => d.displayName || d.display_name, { message: "display_name is required" })
   .refine((d) => d.churchId || d.church_id, { message: "church_id is required" });
+
+/**
+ * What signup now takes: a reference to a registration the server already holds
+ * and has already checked, and nothing else.
+ *
+ * Deliberately not the account details again. Re-sending them would mean the
+ * final request could disagree with the one that passed verification — a
+ * different church, a different email, a different role — and the server would
+ * have no principled way to choose between them. The details it uses are the
+ * ones it stored, so there is nothing here for a client to contradict.
+ */
+const signupCompleteSchema = z.object({
+  pendingRegistrationId: z.string().uuid(),
+});
+
+const telegramStatusSchema = z.object({
+  pendingRegistrationId: z.string().uuid(),
+});
 
 const loginSchema = z.object({
   identifier: z.string().min(1),
@@ -105,10 +127,74 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Signup — one transaction, or nothing
+// Registration — described first, verified through Telegram, created last
 // ---------------------------------------------------------------------------
-router.post("/signup", zValidator("json", signupSchema), async (c) => {
+//
+// An account is not created because someone filled in a form. It is created
+// because the backend watched a Telegram account say hello to the bot on the
+// strength of a token only that form could have produced.
+//
+// The order matters and is the whole design: nothing that can authenticate
+// exists until the check has passed. A profiles row written first and cleaned
+// up later would be an account that briefly worked, and "briefly" is all an
+// attacker needs. So the details wait in pending_registrations, which grants
+// nothing, and become an account in one transaction at the end.
+
+/** Shared by /telegram/start and /signup — the church half of a registration. */
+async function assertChurchAndBranch(
+  tx: typeof db,
+  churchId: string,
+  branchId: string | null,
+): Promise<void> {
+  const church = await tx.query.churches.findFirst({ where: eq(churches.id, churchId) });
+  if (!church) throw Errors.validation("Unknown church");
+
+  if (branchId) {
+    const branch = await tx.query.branches.findFirst({
+      where: and(eq(branches.id, branchId), eq(branches.churchId, churchId)),
+    });
+    if (!branch) throw Errors.validation("Branch does not belong to that church");
+  }
+}
+
+/**
+ * Refuses an address that is already spoken for.
+ *
+ * Runs twice: once at /telegram/start, so someone is not sent off to Telegram
+ * only to be told at the end that their email was taken; and again inside the
+ * signup transaction, which is the answer that actually counts.
+ */
+async function assertContactsFree(
+  tx: typeof db,
+  email: string | null,
+  phone: string | null,
+): Promise<void> {
+  if (email) {
+    const existing = await tx.query.users.findFirst({ where: eq(users.email, email) });
+    if (existing) throw Errors.conflict("Email already in use");
+  }
+  if (phone) {
+    const existing = await tx.query.users.findFirst({ where: eq(users.phone, phone) });
+    if (existing) throw Errors.conflict("Phone number already in use");
+  }
+}
+
+/**
+ * Step 3 of the wizard: take the details, hold them, and hand back a deep link.
+ *
+ * The link carries a token and nothing else. No password, no email, no church —
+ * a Telegram deep link ends up in a chat log, and the only thing in it that
+ * matters is a value that is useless without the row it points at.
+ */
+router.post("/telegram/start", zValidator("json", signupSchema), async (c) => {
   const body = c.req.valid("json");
+
+  if (!telegramSignupEnabled) {
+    throw Errors.unavailable(
+      "TELEGRAM_DISABLED",
+      "Registration is temporarily unavailable on this server.",
+    );
+  }
 
   const displayName = (body.displayName ?? body.display_name)!.trim();
   const churchId = (body.churchId ?? body.church_id)!;
@@ -121,78 +207,166 @@ router.post("/signup", zValidator("json", signupSchema), async (c) => {
     throw Errors.validation("Invalid phone number");
   }
 
+  await assertChurchAndBranch(db, churchId, branchId);
+  await assertContactsFree(db, email, normalizedPhone);
+
+  // Hashed here, on arrival. The plaintext exists only for the life of this
+  // request and is never written anywhere, including this row.
   const passwordHash = await hash(body.password);
 
-  // Everything that has to exist for the account to be usable is created here,
-  // together. The alternative — create the auth user, then insert the profile
-  // in a second request — cannot work once email confirmation is in play: there
-  // is no session yet at that point, the second call is rejected, and what is
-  // left behind is an account with no profile, which can never log in and which
-  // nobody can clean up but a DBA.
+  const started = await startPendingRegistration({
+    displayName,
+    email,
+    phone: normalizedPhone,
+    passwordHash,
+    churchId,
+    branchId,
+    churchRole,
+    language: body.language,
+  });
+
+  return c.json(started);
+});
+
+/**
+ * What the server believes about a pending registration.
+ *
+ * Polled by the app while the user is off in Telegram. It reports only the
+ * server's own view — the client has no way to assert connectedness, which is
+ * the point of the whole mechanism.
+ */
+router.get("/telegram/status", async (c) => {
+  const parsed = telegramStatusSchema.safeParse({
+    pendingRegistrationId: c.req.query("pendingRegistrationId"),
+  });
+  if (!parsed.success) throw Errors.validation("pendingRegistrationId is required");
+
+  const status = await getPendingRegistrationStatus(parsed.data.pendingRegistrationId);
+  return c.json(status);
+});
+
+/**
+ * Creates the account — one transaction, or nothing.
+ *
+ * Re-verifies everything rather than trusting that /telegram/status was ever
+ * called or that it said yes. The status endpoint is a courtesy for the UI; this
+ * is the gate. A client that skips straight here with a pendingRegistrationId
+ * whose Telegram half never arrived gets refused exactly as it should be.
+ */
+router.post("/signup", zValidator("json", signupCompleteSchema), async (c) => {
+  const { pendingRegistrationId } = c.req.valid("json");
+
   let created: {
     userId: string;
     email: string | null;
     phone: string | null;
+    churchId: string;
+    branchId: string | null;
     verificationToken: string | null;
   };
 
   try {
     created = await db.transaction(async (tx) => {
-      const church = await tx.query.churches.findFirst({ where: eq(churches.id, churchId) });
-      if (!church) throw Errors.validation("Unknown church");
+      // Locked for the life of the transaction, so two submits racing on one
+      // registration cannot both get past the consumed check below.
+      const [pending] = await tx
+        .select()
+        .from(pendingRegistrations)
+        .where(eq(pendingRegistrations.id, pendingRegistrationId))
+        .for("update");
 
-      if (branchId) {
-        const branch = await tx.query.branches.findFirst({
-          where: and(eq(branches.id, branchId), eq(branches.churchId, churchId)),
-        });
-        if (!branch) throw Errors.validation("Branch does not belong to that church");
+      if (!pending) {
+        throw Errors.validation("REGISTRATION_NOT_FOUND");
+      }
+      if (pending.consumedAt) {
+        throw Errors.conflict("This registration has already been completed.");
+      }
+      if (pending.expiresAt.getTime() <= Date.now()) {
+        throw Errors.unavailable(
+          "REGISTRATION_EXPIRED",
+          "Your registration session expired. Please start again.",
+        );
+      }
+      // The check the whole feature exists for. Not a claim from the client, not
+      // a cached answer from /telegram/status — the column the webhook wrote.
+      if (!pending.telegramUserId) {
+        throw Errors.forbidden("TELEGRAM_NOT_VERIFIED");
       }
 
-      if (email) {
-        const existing = await tx.query.users.findFirst({ where: eq(users.email, email) });
-        if (existing) throw Errors.conflict("Email already in use");
-      }
-      if (normalizedPhone) {
-        const existing = await tx.query.users.findFirst({ where: eq(users.phone, normalizedPhone) });
-        if (existing) throw Errors.conflict("Phone number already in use");
+      await assertChurchAndBranch(tx as unknown as typeof db, pending.churchId, pending.branchId);
+      await assertContactsFree(tx as unknown as typeof db, pending.email, pending.phone);
+
+      // Re-checked inside the transaction: a Telegram account confirmed here
+      // could have completed a different registration in the meantime. The
+      // partial unique index on profiles is the real arbiter; this makes the
+      // refusal a clean 409 instead of a constraint error.
+      const claimed = await tx.query.profiles.findFirst({
+        where: eq(profiles.telegramUserId, pending.telegramUserId),
+      });
+      if (claimed) {
+        throw Errors.conflict("TELEGRAM_ALREADY_LINKED");
       }
 
       const [user] = await tx
         .insert(users)
-        .values({ email, phone: normalizedPhone, passwordHash })
+        .values({
+          email: pending.email,
+          phone: pending.phone,
+          passwordHash: pending.passwordHash,
+        })
         .returning();
 
       await tx.insert(profiles).values({
         id: user.id,
-        displayName,
-        phone: normalizedPhone,
-        churchId,
-        branchId,
-        churchRole,
+        displayName: pending.displayName,
+        phone: pending.phone,
+        churchId: pending.churchId,
+        branchId: pending.branchId,
+        churchRole: pending.churchRole,
         // Never taken from the request. A signup produces a member; every other
         // role is granted by a review someone else performs.
         role: "member",
-        language: body.language,
+        language: pending.language,
+        telegramUserId: pending.telegramUserId,
+        telegramUsername: pending.telegramUsername,
+        telegramVerifiedAt: pending.telegramConfirmedAt ?? new Date(),
       });
+
+      // Consumed inside the same transaction, conditional on still being
+      // unconsumed. One confirmed registration, one account.
+      const consumed = await tx
+        .update(pendingRegistrations)
+        .set({ consumedAt: new Date() })
+        .where(and(
+          eq(pendingRegistrations.id, pending.id),
+          isNull(pendingRegistrations.consumedAt),
+        ))
+        .returning();
+      if (consumed.length === 0) {
+        throw Errors.conflict("This registration has already been completed.");
+      }
 
       // Issued inside the transaction so a rollback takes the token with it and
       // no link can ever point at an account that was not created.
-      const verification = email
-        ? await issueVerificationToken(tx, user.id, email)
+      const verification = pending.email
+        ? await issueVerificationToken(tx, user.id, pending.email)
         : null;
 
       return {
         userId: user.id,
         email: user.email,
         phone: user.phone,
+        churchId: pending.churchId,
+        branchId: pending.branchId,
         verificationToken: verification?.token ?? null,
       };
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      // Lost a race against a concurrent signup on the same address. The
-      // transaction rolled back, so there is no half-made account to clean up.
-      throw Errors.conflict("Email or phone number already in use");
+      // Lost a race against a concurrent signup on the same address or the same
+      // Telegram identity. The transaction rolled back, so there is no half-made
+      // account to clean up.
+      throw Errors.conflict("Email, phone number, or Telegram account already in use");
     }
     throw err;
   }
@@ -210,9 +384,9 @@ router.post("/signup", zValidator("json", signupSchema), async (c) => {
 
   const token = await createToken({
     userId: created.userId,
-    churchId,
+    churchId: created.churchId,
     role: "member",
-    branchId,
+    branchId: created.branchId,
     email: created.email,
     emailVerified: false,
   });

@@ -16,6 +16,15 @@ process.env.S3_SECRET_ACCESS_KEY ??= "test";
 process.env.S3_BUCKET_RESOURCES ??= "resources";
 process.env.S3_BUCKET_PASTOR_DOCS ??= "pastor-docs";
 
+// Registration is gated on Telegram being configured (see telegramSignupEnabled
+// in src/config). Without these the signup route fails closed, which is the
+// correct production behaviour and useless as a test default — every suite that
+// creates an account would be testing the refusal instead of the flow.
+// telegram.test.ts sets its own token and secret over the top of these.
+process.env.TELEGRAM_BOT_TOKEN ??= "test-bot-token";
+process.env.TELEGRAM_WEBHOOK_SECRET ??= "test-webhook-secret";
+process.env.TELEGRAM_BOT_USERNAME ??= "BirhanTestBot";
+
 // Empty, not unset: config/index.ts calls dotenv.config(), which leaves any key
 // already present in process.env alone but would otherwise pull a real key out
 // of backend/.env. That key switches on @better-auth/infra, which needs zod v4

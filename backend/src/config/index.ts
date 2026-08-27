@@ -87,6 +87,29 @@ export const config = {
 
   /** Link codes one church may generate per hour. */
   telegramCodesPerHour: parseInt(process.env.TELEGRAM_CODES_PER_HOUR || "6", 10),
+
+  /**
+   * The bot's @name, without the @, e.g. "BirhanBot".
+   *
+   * Only needed for the registration deep link (https://t.me/<name>?start=...),
+   * which is the one place the bot has to be addressed by name rather than by
+   * token. Never hardcoded and never guessed from the token: a wrong name sends
+   * people to a stranger's bot and hands it their registration token.
+   */
+  telegramBotUsername: (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, ""),
+
+  /**
+   * How long an unfinished registration survives. Short: it is holding a
+   * password hash and contact details for someone who does not have an account
+   * yet, so the window to finish is minutes, not days.
+   */
+  pendingRegistrationTtlMinutes: parseInt(
+    process.env.PENDING_REGISTRATION_TTL_MINUTES || "10",
+    10,
+  ),
+
+  /** Registration attempts one IP may start per hour. */
+  registrationStartsPerHour: parseInt(process.env.REGISTRATION_STARTS_PER_HOUR || "10", 10),
 };
 
 /**
@@ -97,6 +120,24 @@ export const config = {
  * worse than the feature simply being off.
  */
 export const telegramEnabled = Boolean(config.telegramBotToken && config.telegramWebhookSecret);
+
+/**
+ * True once the bot can also be *addressed by name*, which registration needs
+ * and group linking does not.
+ *
+ * Registration is gated on this and fails closed without it. That is
+ * deliberate: the whole point of the requirement is that an account cannot
+ * exist without a Telegram identity behind it, so a server that cannot check
+ * Telegram must refuse to register people rather than quietly waive the check.
+ * Setting TELEGRAM_BOT_USERNAME is therefore a deployment prerequisite, not an
+ * optional extra.
+ */
+export const telegramSignupEnabled = Boolean(telegramEnabled && config.telegramBotUsername);
+
+/** The deep link a pending registration hands to the user. */
+export function telegramStartLink(payload: string): string {
+  return `https://t.me/${config.telegramBotUsername}?start=${payload}`;
+}
 
 /**
  * True once the local mail endpoint has been given a signing secret and a From

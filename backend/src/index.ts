@@ -55,7 +55,25 @@ app.route("/api/v1/telegram-webhook", telegramWebhookRoutes);
 app.route("/api/v1/churches", churchRoutes);
 // app.route() takes (path, router) only — the middleware has to be mounted
 // separately or it is silently dropped and the endpoint runs unthrottled.
-app.use("/api/v1/auth/*", rateLimitByIp(30, 60));
+// Three different appetites live under this one prefix, so the limiter has to
+// tell them apart:
+//   - /telegram/status is polled every few seconds while the user is away in
+//     Telegram. At 30/hour it would throttle a perfectly normal registration
+//     into failure, so it gets its own generous budget.
+//   - /telegram/start writes a password hash and a token per call. It gets the
+//     tightest budget of the three.
+//   - everything else keeps the original limit.
+const authLimiter = rateLimitByIp(30, 60);
+const registrationStartLimiter = rateLimitByIp(config.registrationStartsPerHour, 60);
+// Generous on purpose: a ten-minute wait polled every four seconds is ~150
+// requests for ONE person, and this limiter keys on IP alone — a shared line or
+// a café would otherwise throttle the second person to register that hour.
+const registrationStatusLimiter = rateLimitByIp(1000, 60);
+app.use("/api/v1/auth/*", (c, next) => {
+  if (c.req.path === "/api/v1/auth/telegram/status") return registrationStatusLimiter(c, next);
+  if (c.req.path === "/api/v1/auth/telegram/start") return registrationStartLimiter(c, next);
+  return authLimiter(c, next);
+});
 app.route("/api/v1/auth", authRoutes);
 
 // Authenticated routes

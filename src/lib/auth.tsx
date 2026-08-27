@@ -54,19 +54,23 @@ export type Profile = {
   email_verified: boolean;
 };
 
+export type ResendResult =
+  | { status: 'sent' }
+  | { status: 'already_verified' }
+  | { status: 'error'; code: string; message: string };
+
+/**
+ * Signup takes a reference to a registration the server is already holding —
+ * not the account details.
+ *
+ * The details went to /auth/telegram/start at the beginning of step 3, and the
+ * server has been holding them (with the password already argon2-hashed) while
+ * the user was away in Telegram. Sending them again here would let this request
+ * disagree with the one that passed verification, so it does not carry them.
+ * See src/lib/telegramSignup.ts.
+ */
 export type SignUpParams = {
-  email?: string;
-  phone?: string;
-  password: string;
-  displayName: string;
-  churchId: string;
-  branchId?: string | null;
-  /** Accepted and forwarded, but the backend's signup schema currently
-   * ignores it — unknown fields are stripped, not rejected. Kept here only
-   * because the existing call site (auth.tsx) already computes and sends it. */
-  branchName?: string;
-  churchRole?: string | null;
-  language: 'am' | 'en';
+  pendingRegistrationId: string;
 };
 
 type AuthState = {
@@ -76,10 +80,32 @@ type AuthState = {
   ready: boolean;
   isPastor: boolean;
   isSuperAdmin: boolean;
-  signIn: (identifier: string, password: string) => Promise<{ error?: string }>;
-  signUp: (params: SignUpParams) => Promise<{ error?: string }>;
+  /**
+   * Set right after a signup that included an email; cleared by
+   * dismissEmailVerificationPrompt() or automatically once profile.email_verified
+   * flips true. Not persisted — a fresh app launch starts with this null even
+   * if the address is still unconfirmed, so the account isn't gated on
+   * re-showing it. explore.tsx surfaces a standing, dismissable-forever
+   * verification status for anyone who closed this without verifying.
+   */
+  pendingEmailVerification: { email: string; verificationSent: boolean } | null;
+  dismissEmailVerificationPrompt: () => void;
+  signIn: (identifier: string, password: string) => Promise<{ error?: string; code?: string }>;
+  signUp: (
+    params: SignUpParams,
+  ) => Promise<{ error?: string; code?: string; hasEmail?: boolean; verificationSent?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Mints a fresh JWT from the current one. Required after email
+   * verification: requireVerifiedEmail's fast path trusts the JWT's
+   * email_verified CLAIM, not a live DB read, so the existing 30-day token
+   * stays stale until this is called — refreshProfile() alone only updates
+   * what's displayed, not what write requests actually carry. */
+  refreshToken: () => Promise<boolean>;
+  resendVerificationEmail: () => Promise<ResendResult>;
+  /** Convenience for the verify-email deep link and app-foreground checks:
+   * refreshToken() then refreshProfile(), silently no-op offline. */
+  syncVerification: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthState | null>(null);
@@ -152,23 +178,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
+  const [pendingEmailVerification, setPendingEmailVerification] = useState<
+    { email: string; verificationSent: boolean } | null
+  >(null);
+
+  const dismissEmailVerificationPrompt = useCallback(() => {
+    setPendingEmailVerification(null);
+  }, []);
+
+  // Once the profile catches up and says the address is confirmed, the
+  // prompt has nothing left to ask for — clear it even if the user never
+  // tapped through it themselves (e.g. verified via the deep link while this
+  // screen wasn't open).
+  useEffect(() => {
+    if (profile?.email_verified && pendingEmailVerification) {
+      setPendingEmailVerification(null);
+    }
+  }, [profile?.email_verified, pendingEmailVerification]);
 
   // Launch: read the token from disk only — no network call, so the app opens
   // offline. The JWT's own claims are enough to gate the UI immediately;
   // the richer profile loads opportunistically once there's connectivity.
   useEffect(() => {
+    let mounted = true;
     (async () => {
-      const token = await getToken();
-      if (token) {
-        const s = sessionFromToken(token);
-        if (s) {
-          setSession(s);
-        } else {
-          await clearToken(); // expired or corrupt — don't keep a dead token
+      try {
+        const token = await getToken();
+        if (!mounted) return;
+        if (token) {
+          const s = sessionFromToken(token);
+          if (s) {
+            setSession(s);
+          } else {
+            await clearToken(); // expired or corrupt — don't keep a dead token
+          }
         }
+      } catch (err) {
+        // SecureStore may throw in some environments (e.g., missing native module).
+        // Don't block the app — treat as signed out.
+        if (!mounted) return;
+        if (__DEV__) console.warn('[AuthProvider] getToken failed:', err);
+      } finally {
+        if (mounted) setReady(true);
       }
-      setReady(true);
     })();
+    return () => { mounted = false; };
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -190,6 +244,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session, refreshProfile]);
 
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await apiFetch<{ token: string }>('/api/v1/auth/refresh', { method: 'POST' });
+      await setToken(res.token);
+      setSession(sessionFromToken(res.token));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const resendVerificationEmail = useCallback(async (): Promise<ResendResult> => {
+    try {
+      const res = await apiFetch<{ status: string }>('/api/v1/auth/resend-verification', {
+        method: 'POST',
+        body: {},
+      });
+      return res.status === 'already_verified' ? { status: 'already_verified' } : { status: 'sent' };
+    } catch (err) {
+      if (err instanceof ApiError) return { status: 'error', code: err.code, message: err.message };
+      return { status: 'error', code: 'OFFLINE', message: errorMessage(err) };
+    }
+  }, []);
+
+  const syncVerification = useCallback(async (): Promise<void> => {
+    const ok = await refreshToken();
+    if (ok) await refreshProfile();
+  }, [refreshToken, refreshProfile]);
+
   const signIn = useCallback(async (identifier: string, password: string) => {
     try {
       const res = await apiFetch<{ token: string }>('/api/v1/auth/login', {
@@ -201,32 +284,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(sessionFromToken(res.token));
       return {};
     } catch (err) {
-      return { error: errorMessage(err) };
+      return {
+        error: errorMessage(err),
+        code: err instanceof ApiError ? err.code : err instanceof OfflineError ? 'OFFLINE' : undefined,
+      };
     }
   }, []);
 
   const signUp = useCallback(async (params: SignUpParams) => {
     try {
-      const res = await apiFetch<{ token: string }>('/api/v1/auth/signup', {
-        method: 'POST',
-        body: {
-          email: params.email,
-          phone: params.phone,
-          password: params.password,
-          displayName: params.displayName,
-          churchId: params.churchId,
-          branchId: params.branchId ?? null,
-          branchName: params.branchName,
-          churchRole: params.churchRole ?? null,
-          language: params.language,
+      const res = await apiFetch<{ token: string; user: { email: string | null }; verificationSent: boolean }>(
+        '/api/v1/auth/signup',
+        {
+          method: 'POST',
+          body: { pendingRegistrationId: params.pendingRegistrationId },
+          auth: false,
         },
-        auth: false,
-      });
+      );
       await setToken(res.token);
       setSession(sessionFromToken(res.token));
-      return {};
+      if (res.user.email) {
+        setPendingEmailVerification({ email: res.user.email, verificationSent: res.verificationSent });
+      }
+      return { hasEmail: !!res.user.email, verificationSent: res.verificationSent };
     } catch (err) {
-      return { error: errorMessage(err) };
+      return {
+        error: errorMessage(err),
+        code: err instanceof ApiError ? err.code : err instanceof OfflineError ? 'OFFLINE' : undefined,
+      };
     }
   }, []);
 
@@ -238,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearToken();
     setSession(null);
     setProfile(null);
+    setPendingEmailVerification(null);
   }, []);
 
   // profile.role (fresh from GET /me) wins whenever it's available — the JWT
@@ -251,7 +337,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ session, profile, ready, isPastor, isSuperAdmin, signIn, signUp, signOut, refreshProfile }}
+      value={{
+        session,
+        profile,
+        ready,
+        isPastor,
+        isSuperAdmin,
+        signIn,
+        signUp,
+        signOut,
+        refreshProfile,
+        refreshToken,
+        resendVerificationEmail,
+        syncVerification,
+        pendingEmailVerification,
+        dismissEmailVerificationPrompt,
+      }}
     >
       {children}
     </Ctx.Provider>

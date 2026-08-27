@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import * as DocumentPicker from 'expo-document-picker';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 import { apiFetch } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -31,6 +32,26 @@ import {
   isClergyRole,
   RoleDefinition,
 } from '../constants/roles';
+import { PasswordField } from '../components/auth/password-field';
+import { PasswordRequirements } from '../components/auth/password-requirements';
+import { ConfirmPasswordStatus } from '../components/auth/confirm-password-status';
+import { StepIndicator } from '../components/auth/step-indicator';
+import { TelegramConnectStep } from '../components/auth/telegram-connect-step';
+import {
+  startTelegramRegistration,
+  type PendingRegistration,
+  type TelegramStatus,
+} from '../lib/telegramSignup';
+
+/** Same validation the backend applies server-side (backend/src/utils/phone.ts
+ * uses the same library) — a phone that fails here would fail there too. */
+function isValidPhone(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '+251') return false;
+  const withCode = trimmed.startsWith('0') ? `+251${trimmed.slice(1)}` : trimmed;
+  const parsed = parsePhoneNumberFromString(withCode);
+  return !!parsed?.isValid();
+}
 
 // Sentinel church id for "my church isn't listed" → submits a review request.
 const OTHER_CHURCH = '__other__';
@@ -39,21 +60,31 @@ const OTHER_CHURCH = '__other__';
  * Auth screen — plain React Native + the app's own theme tokens (no Tamagui).
  * Features:
  * - 52px input & dropdown height for comfortable touch targets and Ge'ez text display.
- * - 2-step wizard for registration (Step 1: Account Info, Step 2: Church Info).
+ * - 3-step wizard for registration (Step 1: Account Info, Step 2: Church Info,
+ *   Step 3: Connect Telegram). No account exists until step 3 is confirmed
+ *   server-side — see src/lib/telegramSignup.ts.
  * - Full Step 1 validation gate before advancing to Step 2.
  * - Step 2 "Back" button preserves all entered Step 1 data.
- * - Zero auth user creation before final submit from Step 2.
+ * - Zero auth user creation before final submit from Step 3.
  * - Intact EECMY Qes vs Pastor clergy KYC verification routing.
  */
 export default function Auth() {
   const { signIn, signUp, refreshProfile } = useAuth();
   const { c, lang, setLang } = useApp();
   const [mode, setMode] = useState<'in' | 'up' | 'pastor'>('in');
-  const [signupStep, setSignupStep] = useState<1 | 2>(1);
+  const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
+
+  // Step 3 — the Telegram handshake. `pending` is the registration the server
+  // is holding; `telegramStatus` is the server's answer about it. Neither is
+  // ever set from anything this screen decides on its own.
+  const [pending, setPending] = useState<PendingRegistration | null>(null);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatus | null>(null);
+  const [startingTelegram, setStartingTelegram] = useState(false);
 
   // Account Section States (Step 1)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+251 ');
 
@@ -61,6 +92,7 @@ export default function Auth() {
   const [churches, setChurches] = useState<
     { id: string; name_am: string; name_en: string; denomination?: string | null }[]
   >([]);
+  const [churchesLoading, setChurchesLoading] = useState(false);
   const [churchId, setChurchId] = useState<string | null>(null);
   const [branches, setBranches] = useState<
     { id: string; name_am: string; name_en: string }[]
@@ -107,6 +139,7 @@ export default function Auth() {
   // exists yet at this point in the flow.
   useEffect(() => {
     if (mode === 'up' || mode === 'pastor') {
+      setChurchesLoading(true);
       apiFetch<{ churches: any[] }>('/api/v1/churches', { auth: false })
         .then((res) => {
           const sorted = [...res.churches].sort((a, b) => a.nameEn.localeCompare(b.nameEn));
@@ -119,7 +152,8 @@ export default function Auth() {
             })),
           );
         })
-        .catch((err) => reportError(err, 'Auth.loadChurches', lang, false));
+        .catch((err) => reportError(err, 'Auth.loadChurches', lang, false))
+        .finally(() => setChurchesLoading(false));
     }
   }, [mode, lang]);
 
@@ -143,6 +177,12 @@ export default function Auth() {
   }, [churchId]);
 
   // Per-field inline validation
+  // Only one of email/phone is required — never both. `contact` is a
+  // pseudo-field: it doesn't belong to a single input, so its error renders
+  // under the "how can we reach you" section instead of under either field.
+  const hasEmail = !!email.trim();
+  const hasPhone = !!phone.trim() && phone.trim() !== '+251';
+
   const validateField = useCallback(
     (field: string, value: any) => {
       let errorMsg = '';
@@ -150,10 +190,21 @@ export default function Auth() {
         if (!value || !String(value).trim()) errorMsg = t(lang, 'errNameRequired');
       } else if (field === 'email') {
         const trimmed = String(value).trim();
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!trimmed || !emailRegex.test(trimmed)) errorMsg = t(lang, 'errEmailInvalid');
+        if (trimmed) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(trimmed)) errorMsg = t(lang, 'errEmailInvalid');
+        }
+      } else if (field === 'phone') {
+        const trimmed = String(value).trim();
+        if (trimmed && trimmed !== '+251' && !isValidPhone(trimmed)) {
+          errorMsg = t(lang, 'errInvalidPhone');
+        }
+      } else if (field === 'contact') {
+        if (!hasEmail && !hasPhone) errorMsg = t(lang, 'errContactRequired');
       } else if (field === 'password') {
         if (!value || String(value).length < 8) errorMsg = t(lang, 'errPasswordShort');
+      } else if (field === 'confirmPassword') {
+        if (String(value) !== password) errorMsg = t(lang, 'pwdNotMatchYet');
       } else if (field === 'churchId') {
         if (!value) errorMsg = t(lang, 'errChurchRequired');
       } else if (field === 'branchId') {
@@ -165,7 +216,7 @@ export default function Auth() {
       setFieldErrors((prev) => ({ ...prev, [field]: errorMsg }));
       return !errorMsg;
     },
-    [lang, branches.length]
+    [lang, branches.length, hasEmail, hasPhone, password]
   );
 
   const handleBlur = (field: string, value: any) => {
@@ -179,14 +230,20 @@ export default function Auth() {
       ...prev,
       name: true,
       email: true,
+      phone: true,
+      contact: true,
       password: true,
+      confirmPassword: true,
     }));
 
     const validName = validateField('name', name);
     const validEmail = validateField('email', email);
+    const validPhone = validateField('phone', phone);
+    const validContact = validateField('contact', null);
     const validPass = validateField('password', password);
+    const validConfirm = validateField('confirmPassword', confirmPassword);
 
-    return validName && validEmail && validPass;
+    return validName && validEmail && validPhone && validContact && validPass && validConfirm;
   };
 
   const handleNextStep1 = () => {
@@ -285,7 +342,15 @@ export default function Auth() {
       setBusy(true);
       const res = await signIn(email.trim(), password);
       setBusy(false);
-      if (res.error) setErr(res.error);
+      if (res.error) {
+        setErr(
+          res.code === 'UNAUTHENTICATED'
+            ? t(lang, 'errWrongCredentials')
+            : res.code === 'OFFLINE'
+              ? t(lang, 'errCouldNotReachServer')
+              : res.error,
+        );
+      }
       return;
     }
 
@@ -318,43 +383,119 @@ export default function Auth() {
       return;
     }
 
-    // Standard Sign Up (Step 2 Final Submission)
-    setTouched((prev) => ({
-      ...prev,
-      churchId: true,
-      branchId: true,
-      churchRole: true,
-    }));
+    // Step 3 final submission. Everything the account is made from was handed
+    // over at the start of step 3 and has been sitting on the server since; all
+    // this carries is the reference. The backend re-checks the Telegram half
+    // itself — it does not take our word for it, and it should not.
+    if (!pending) return;
 
+    setBusy(true);
+    const res = await signUp({ pendingRegistrationId: pending.pendingId });
+    setBusy(false);
+
+    if (res.error) {
+      // FORBIDDEN here means the server disagrees that Telegram was confirmed —
+      // the one case where the screen must not just show a generic failure,
+      // because the fix is "go back and finish in Telegram".
+      if (res.code === 'FORBIDDEN') {
+        setTelegramStatus({ status: 'waiting', expiresAt: pending.expiresAt });
+        setErr(t(lang, 'telegramConnectToContinue'));
+        return;
+      }
+      if (res.code === 'REGISTRATION_EXPIRED') {
+        setTelegramStatus({ status: 'expired' });
+        setErr(t(lang, 'telegramSessionExpired'));
+        return;
+      }
+      setErr(
+        res.code === 'CONFLICT'
+          ? hasEmail && !hasPhone
+            ? t(lang, 'errAccountExists')
+            : hasPhone && !hasEmail
+              ? t(lang, 'errPhoneInUse')
+              : res.error
+          : res.code === 'OFFLINE'
+            ? t(lang, 'errCouldNotReachServer')
+            : res.code === 'VALIDATION_ERROR'
+              ? res.error
+              : t(lang, 'errCouldNotCreateAccount'),
+      );
+    }
+    // No navigation on success — session is now set, and _layout.tsx's Gate
+    // swaps this whole screen out on its own (for an email signup, into
+    // EmailVerificationScreen first; this component simply unmounts either way).
+  };
+
+  /** Step 2's own gate, split out so both "Next" and a retry can use it. */
+  const validateStep2 = () => {
+    setTouched((prev) => ({ ...prev, churchId: true, branchId: true, churchRole: true }));
     const validChurch = validateField('churchId', churchId);
     const validBranch = validateField('branchId', branchId);
     const validRole = validateField('churchRole', churchRole);
+    return validChurch && validBranch && validRole;
+  };
 
-    if (!validChurch || !validBranch || !validRole) {
-      return;
-    }
+  /**
+   * Hands the details to the server and gets a deep link back.
+   *
+   * This is the only moment the password leaves the device, and it still does
+   * not create an account — the server hashes it and holds it against a pending
+   * registration that grants nothing until Telegram confirms.
+   */
+  const beginTelegram = useCallback(async () => {
+    setErr(null);
+    setStartingTelegram(true);
+    setTelegramStatus(null);
+    setPending(null);
 
-    setBusy(true);
-    const branchNameStr = selectedBranch
-      ? isAm
-        ? selectedBranch.name_am
-        : selectedBranch.name_en
-      : undefined;
-
-    const res = await signUp({
-      email: email.trim(),
+    const res = await startTelegramRegistration({
+      // Backend validates email with z.string().email() when present — an
+      // empty string (the phone-only case) would fail that as a malformed
+      // address rather than being treated as "not provided".
+      email: hasEmail ? email.trim() : undefined,
+      phone: hasPhone ? phone.trim() : undefined,
       password,
       displayName: name.trim(),
       churchId: churchId!,
-      branchName: branchNameStr,
       branchId,
-      phone: phone.trim() !== '+251' && phone.trim() !== '' ? phone.trim() : undefined,
       churchRole,
       language: prefLang,
     });
+    setStartingTelegram(false);
 
-    setBusy(false);
-    if (res.error) setErr(res.error);
+    if (!res.ok) {
+      setErr(
+        res.code === 'CONFLICT'
+          ? hasEmail && !hasPhone
+            ? t(lang, 'errAccountExists')
+            : hasPhone && !hasEmail
+              ? t(lang, 'errPhoneInUse')
+              : res.message
+          : res.code === 'OFFLINE'
+            ? t(lang, 'errCouldNotReachServer')
+            : res.code === 'TELEGRAM_DISABLED'
+              ? t(lang, 'telegramUnavailable')
+              : res.code === 'VALIDATION_ERROR'
+                ? res.message
+                : t(lang, 'errCouldNotCreateAccount'),
+      );
+      return false;
+    }
+
+    setPending(res.pending);
+    return true;
+  }, [hasEmail, hasPhone, email, phone, password, name, churchId, branchId, churchRole, prefLang, lang]);
+
+  /** Step 2 → step 3. Advances only once the server has issued a link. */
+  const handleNextStep2 = async () => {
+    if (!validateStep2()) return;
+    // "Other church" has no backend route yet (see the NOT MIGRATED note in
+    // submit); leave that path exactly where it was.
+    if (isOther) {
+      await submit();
+      return;
+    }
+    if (await beginTelegram()) setSignupStep(3);
   };
 
   // Render Success Screen for Pastor Review
@@ -437,66 +578,127 @@ export default function Auth() {
           </View>
         )}
 
-        {/* ===================== 2-STEP SIGNUP WIZARD ===================== */}
+        {/* ===================== 3-STEP SIGNUP WIZARD ===================== */}
         {mode === 'up' && (
           <View style={{ gap: 16 }}>
             {/* Step Progress Indicator */}
-            <View style={[s.card, { borderColor: c.border, backgroundColor: c.surface, gap: 8 }]}>
-              <View style={s.rowBetween}>
-                <Text style={[s.stepTitle, { color: c.text }]}>
-                  {signupStep === 1 ? t(lang, 'accountSectionTitle') : t(lang, 'churchSectionTitle')}
-                </Text>
-                <Text style={[s.stepCount, { color: c.accent }]}>
-                  {t(lang, 'stepIndicator').replace('%1', String(signupStep)).replace('%2', '2')}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-                <View style={[s.progressSeg, { backgroundColor: c.accent }]} />
-                <View style={[s.progressSeg, { backgroundColor: signupStep === 2 ? c.accent : c.border }]} />
-              </View>
+            <View style={[s.card, { borderColor: c.border, backgroundColor: c.surface }]}>
+              <StepIndicator
+                c={c}
+                step={signupStep}
+                labels={[
+                  t(lang, 'stepAccount'),
+                  t(lang, 'stepChurch'),
+                  t(lang, 'stepTelegram'),
+                ]}
+              />
             </View>
 
             {/* STEP 1: ACCOUNT INFO */}
             {signupStep === 1 && (
               <View style={[s.card, { borderColor: c.border, backgroundColor: c.surface, gap: 16 }]}>
-                <Field
-                  c={c}
-                  label={`${t(lang, 'fullNameLabel')} *`}
-                  placeholder={isAm ? 'ሙሉ ስምዎን ያስገቡ' : 'Enter your full name'}
-                  value={name}
-                  onChangeText={setName}
-                  onBlur={() => handleBlur('name', name)}
-                  error={touched.name ? fieldErrors.name : undefined}
-                />
-                <Field
-                  c={c}
-                  label={`${t(lang, 'emailLabel')} *`}
-                  placeholder="name@example.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  value={email}
-                  onChangeText={setEmail}
-                  onBlur={() => handleBlur('email', email)}
-                  error={touched.email ? fieldErrors.email : undefined}
-                />
-                <Field
-                  c={c}
-                  label={`${t(lang, 'passwordLabel')} *`}
-                  placeholder={isAm ? 'ቢያንስ 8 ፊደላት/ቁጥሮች' : 'At least 8 characters'}
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                  onBlur={() => handleBlur('password', password)}
-                  error={touched.password ? fieldErrors.password : undefined}
-                />
-                <Field
-                  c={c}
-                  label={t(lang, 'phoneLabel')}
-                  placeholder="+251 911 000 000"
-                  keyboardType="phone-pad"
-                  value={phone}
-                  onChangeText={setPhone}
-                />
+                <View>
+                  <Field
+                    c={c}
+                    label={`${t(lang, 'fullNameLabel')} *`}
+                    placeholder={isAm ? 'ሙሉ ስምዎን ያስገቡ' : 'Enter your full name'}
+                    value={name}
+                    onChangeText={setName}
+                    onBlur={() => handleBlur('name', name)}
+                    error={touched.name ? fieldErrors.name : undefined}
+                  />
+                  {!(touched.name && fieldErrors.name) && (
+                    <Text style={[s.helperTxt, { color: c.textFaint }]}>
+                      {t(lang, 'nameHelperText')}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Contact — at least one of email/phone, never both required */}
+                <View>
+                  <Text style={[s.sectionLabel, { color: c.text }]}>{t(lang, 'contactMethodTitle')}</Text>
+                  <Text style={[s.sectionHint, { color: c.textFaint }]}>{t(lang, 'contactMethodHint')}</Text>
+
+                  <View style={{ marginTop: 12 }}>
+                    <Field
+                      c={c}
+                      label={t(lang, 'emailLabel')}
+                      placeholder="name@example.com"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      value={email}
+                      onChangeText={setEmail}
+                      onBlur={() => {
+                        handleBlur('email', email);
+                        validateField('contact', null);
+                      }}
+                      error={touched.email ? fieldErrors.email : undefined}
+                    />
+                    {touched.email && !fieldErrors.email && hasEmail && (
+                      <Text style={[s.okTxt, { color: c.success }]}>✓ {t(lang, 'lookingGood')}</Text>
+                    )}
+                  </View>
+
+                  <View style={s.orRow}>
+                    <View style={[s.orLine, { backgroundColor: c.border }]} />
+                    <Text style={[s.orTxt, { color: c.textFaint }]}>{t(lang, 'orLabel')}</Text>
+                    <View style={[s.orLine, { backgroundColor: c.border }]} />
+                  </View>
+
+                  <View>
+                    <Field
+                      c={c}
+                      label={t(lang, 'phoneLabel')}
+                      placeholder="+251 911 000 000"
+                      keyboardType="phone-pad"
+                      value={phone}
+                      onChangeText={setPhone}
+                      onBlur={() => {
+                        handleBlur('phone', phone);
+                        validateField('contact', null);
+                      }}
+                      error={touched.phone ? fieldErrors.phone : undefined}
+                    />
+                    {touched.phone && !fieldErrors.phone && hasPhone && (
+                      <Text style={[s.okTxt, { color: c.success }]}>✓ {t(lang, 'lookingGood')}</Text>
+                    )}
+                  </View>
+
+                  {touched.contact && fieldErrors.contact ? (
+                    <Text style={[s.fieldErr, { color: c.danger }]}>{fieldErrors.contact}</Text>
+                  ) : null}
+                </View>
+
+                <View>
+                  <PasswordField
+                    c={c}
+                    lang={lang}
+                    label={`${t(lang, 'passwordLabel')} *`}
+                    placeholder={isAm ? 'ቢያንስ 8 ፊደላት/ቁጥሮች' : 'At least 8 characters'}
+                    value={password}
+                    onChangeText={setPassword}
+                    onBlur={() => handleBlur('password', password)}
+                    error={touched.password ? fieldErrors.password : undefined}
+                  />
+                  <PasswordRequirements c={c} lang={lang} password={password} />
+                </View>
+
+                <View>
+                  <PasswordField
+                    c={c}
+                    lang={lang}
+                    label={`${t(lang, 'confirmPasswordLabel')} *`}
+                    placeholder={isAm ? 'የይለፍ ቃል ይድገሙ' : 'Re-enter your password'}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    onBlur={() => handleBlur('confirmPassword', confirmPassword)}
+                    error={touched.confirmPassword ? fieldErrors.confirmPassword : undefined}
+                  />
+                  {!(touched.confirmPassword && fieldErrors.confirmPassword) && (
+                    <ConfirmPasswordStatus c={c} lang={lang} password={password} confirmPassword={confirmPassword} />
+                  )}
+                </View>
+
                 <PrimaryButton c={c} onPress={handleNextStep1}>
                   {`${t(lang, 'btnContinue')} →`}
                 </PrimaryButton>
@@ -509,6 +711,12 @@ export default function Auth() {
                 {/* Church Selector */}
                 <View>
                   <Text style={[s.label, { color: c.text }]}>{`${t(lang, 'churchLabel')} *`}</Text>
+                  {churchesLoading ? (
+                    <View style={[s.dropdown, { backgroundColor: c.bg, borderColor: c.border }]}>
+                      <ActivityIndicator size="small" color={c.accent} style={{ marginRight: 10 }} />
+                      <Text style={[s.ddPlaceholder, { color: c.textFaint }]}>{t(lang, 'loadingChurches')}</Text>
+                    </View>
+                  ) : (
                   <Pressable onPress={() => setShowChurchSheet(true)}>
                     <View
                       style={[
@@ -534,6 +742,7 @@ export default function Auth() {
                       <Icon name="chevron" size={14} color={c.textFaint} />
                     </View>
                   </Pressable>
+                  )}
                   {touched.churchId && fieldErrors.churchId ? (
                     <Text style={[s.fieldErr, { color: c.danger }]}>{fieldErrors.churchId}</Text>
                   ) : null}
@@ -670,8 +879,52 @@ export default function Auth() {
                   >
                     <Text style={[s.btnTxt, { color: c.text }]}>{`← ${t(lang, 'btnBack')}`}</Text>
                   </Pressable>
-                  <PrimaryButton c={c} onPress={submit} disabled={busy} busy={busy} style={{ flex: 2 }}>
-                    {isAm ? 'ምዝገባውን ጨርስ' : 'Create Account'}
+                  <PrimaryButton
+                    c={c}
+                    onPress={handleNextStep2}
+                    disabled={busy || startingTelegram}
+                    busy={busy || startingTelegram}
+                    busyLabel={t(lang, 'creatingAccount')}
+                    style={{ flex: 2 }}
+                  >
+                    {t(lang, 'btnContinue')}
+                  </PrimaryButton>
+                </View>
+              </View>
+            )}
+
+            {/* STEP 3: CONNECT TELEGRAM */}
+            {signupStep === 3 && (
+              <View style={[s.card, { borderColor: c.border, backgroundColor: c.surface, gap: 16 }]}>
+                <TelegramConnectStep
+                  c={c}
+                  lang={lang}
+                  pending={pending}
+                  status={telegramStatus}
+                  onStatusChange={setTelegramStatus}
+                  onStartAgain={beginTelegram}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <Pressable
+                    style={[s.btn, s.btnOutline, { flex: 1, backgroundColor: c.surface, borderColor: c.border }]}
+                    onPress={() => setSignupStep(2)}
+                  >
+                    <Text style={[s.btnTxt, { color: c.text }]}>{`← ${t(lang, 'btnBack')}`}</Text>
+                  </Pressable>
+                  {/* Disabled until the *server* says connected. The label says
+                      why rather than leaving a dead button unexplained. */}
+                  <PrimaryButton
+                    c={c}
+                    onPress={submit}
+                    disabled={busy || telegramStatus?.status !== 'connected'}
+                    busy={busy}
+                    busyLabel={t(lang, 'creatingAccount')}
+                    style={{ flex: 2 }}
+                  >
+                    {telegramStatus?.status === 'connected'
+                      ? t(lang, 'createMyAccount')
+                      : t(lang, 'telegramConnectToContinue')}
                   </PrimaryButton>
                 </View>
               </View>
@@ -928,6 +1181,7 @@ function PrimaryButton({
   onPress,
   disabled,
   busy,
+  busyLabel,
   children,
   style,
 }: {
@@ -935,6 +1189,9 @@ function PrimaryButton({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /** Shown next to the spinner instead of a bare "Loading…" — "Creating your
+   * account…" tells the user what's actually happening. */
+  busyLabel?: string;
   children: React.ReactNode;
   style?: any;
 }) {
@@ -943,8 +1200,16 @@ function PrimaryButton({
       style={[s.btn, { backgroundColor: c.text, opacity: disabled ? 0.6 : 1 }, style]}
       onPress={onPress}
       disabled={disabled}
+      accessibilityState={{ disabled, busy }}
     >
-      {busy ? <ActivityIndicator color={c.bg} /> : <Text style={[s.btnTxt, { color: c.bg }]}>{children}</Text>}
+      {busy ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ActivityIndicator color={c.bg} />
+          {!!busyLabel && <Text style={[s.btnTxt, { color: c.bg }]}>{busyLabel}</Text>}
+        </View>
+      ) : (
+        <Text style={[s.btnTxt, { color: c.bg }]}>{children}</Text>
+      )}
     </Pressable>
   );
 }
@@ -1035,6 +1300,15 @@ const s = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
   input: { height: 52, borderWidth: 1, borderRadius: radius.sm, paddingHorizontal: 14, fontSize: 16 },
   fieldErr: { fontSize: 12, marginTop: 4 },
+  // Ge'ez glyphs run tall and dense — these need roughly double the leading
+  // a same-size Latin line would use (matches bible.tsx's amText ratio).
+  helperTxt: { fontSize: 12, lineHeight: 20, marginTop: 6 },
+  sectionLabel: { fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  sectionHint: { fontSize: 12, lineHeight: 20, marginBottom: 4 },
+  okTxt: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
+  orLine: { flex: 1, height: 1 },
+  orTxt: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.5 },
 
   dropdown: {
     height: 52,

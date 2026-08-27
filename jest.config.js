@@ -1,6 +1,17 @@
 const path = require('path');
 
 /**
+ * babel-preset-expo inlines `process.env.EXPO_PUBLIC_*` at transform time, so a
+ * test file cannot set this for itself — by the time its first line runs, the
+ * value has already been baked into src/lib/api.ts as `undefined` and every
+ * request throws "not configured". Setting it here, before Jest transforms
+ * anything, is the only place it takes effect.
+ *
+ * The host is deliberately unroutable: no test should ever reach a real server.
+ */
+process.env.EXPO_PUBLIC_API_URL ||= 'https://api.birhan.test';
+
+/**
  * `expo-modules-core` is a dependency of `expo`, not of this project, and npm
  * currently nests it under `node_modules/expo/node_modules/` rather than
  * hoisting it (a top-level install resolves to 57.0.14, whose peer range

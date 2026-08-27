@@ -46,6 +46,16 @@ export const profiles = pgTable("profiles", {
   pastorRequestedAt: timestamp("pastor_requested_at", { withTimezone: true }),
   /** Branch the applicant says they lead. Becomes a real branch on approval. */
   pastorBranchName: text("pastor_branch_name"),
+  /**
+   * The Telegram account this person proved they control during registration.
+   * Written only from a webhook-confirmed pending_registration — never from a
+   * client request, which is why a username typed into a form is not enough.
+   * Unique (partial index, migration 0007): one Telegram identity, one account.
+   */
+  telegramUserId: text("telegram_user_id"),
+  /** Display convenience only. Telegram usernames change; the id does not. */
+  telegramUsername: text("telegram_username"),
+  telegramVerifiedAt: timestamp("telegram_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("profiles_church_id_idx").on(table.churchId),
@@ -82,6 +92,41 @@ export const telegramLinkCodes = pgTable("telegram_link_codes", {
 }, (table) => [
   index("telegram_link_codes_code_idx").on(table.code),
   index("telegram_link_codes_church_created_idx").on(table.churchId, table.createdAt),
+]);
+
+/**
+ * A registration that has been described but not yet earned an account.
+ *
+ * Holds everything signup needs and nothing that grants access. It becomes an
+ * account only once `telegramUserId` is filled in by the webhook — see
+ * migration 0007 for why the details cannot simply live in profiles meanwhile.
+ */
+export const pendingRegistrations = pgTable("pending_registrations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  displayName: text("display_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  /** Argon2. Hashed on arrival; never stored or logged in the clear. */
+  passwordHash: text("password_hash").notNull(),
+  churchId: uuid("church_id").notNull().references(() => churches.id, { onDelete: "cascade" }),
+  branchId: uuid("branch_id").references((): AnyPgColumn => branches.id, { onDelete: "set null" }),
+  churchRole: text("church_role"),
+  language: languageEnum("language").notNull().default("am"),
+  /** Public half of the deep-link token; the lookup key. */
+  tokenSelector: text("token_selector").notNull().unique(),
+  /** sha256 of the secret half. The token itself is never stored. */
+  tokenVerifierHash: text("token_verifier_hash").notNull(),
+  telegramUserId: text("telegram_user_id"),
+  telegramUsername: text("telegram_username"),
+  telegramConfirmedAt: timestamp("telegram_confirmed_at", { withTimezone: true }),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  /** Why the bot refused. Currently only ever "telegram_taken". */
+  rejectedReason: text("rejected_reason"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("pending_registrations_selector_idx").on(table.tokenSelector),
+  index("pending_registrations_expires_idx").on(table.expiresAt),
 ]);
 
 export const announcements = pgTable("announcements", {
