@@ -328,6 +328,19 @@
 
   var meta = document.getElementById('dl-meta');
   var shaEl = document.getElementById('dl-sha');
+  var btn = document.getElementById('dl-btn');
+
+  /* Only ever repoint the button at our own HTTPS host. The manifest is ours,
+     but a download button is exactly the thing you do not want following an
+     arbitrary URL if that file is ever tampered with. */
+  function safeApkUrl(u) {
+    try {
+      var url = new URL(u, window.location.href);
+      if (url.protocol !== 'https:') return null;
+      if (url.hostname !== 'birhan.online' && url.hostname !== 'www.birhan.online') return null;
+      return url.href;
+    } catch (e) { return null; }
+  }
 
   function mb(bytes) {
     return (bytes / 1048576).toFixed(0);
@@ -338,6 +351,12 @@
     if (m.versionName) bits.push('v' + m.versionName);
     if (m.sizeBytes) bits.push(mb(m.sizeBytes) + ' MB');
     if (!bits.length) return false;
+
+    /* Point the button at the exact build the manifest describes, so the
+       version, the size and the file people receive can never disagree. The
+       static href stays as the fallback if the manifest cannot be read. */
+    var href = m.apkUrl && safeApkUrl(m.apkUrl);
+    if (href && btn) btn.setAttribute('href', href);
 
     // Size before the tap, in MB, every time — the same data-cost discipline
     // the app itself applies before it downloads anything.

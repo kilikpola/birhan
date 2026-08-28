@@ -2,7 +2,7 @@
   "expo": {
     "name": "birhan",
     "slug": "birhan",
-    "version": "1.0.0",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "birhan",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.birhan",
+      "package": "online.birhan.app",
+      "versionCode": 6,
       "permissions": [
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",

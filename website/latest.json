@@ -1,0 +1,12 @@
+{
+  "versionCode": 6,
+  "versionName": "1.0.5",
+  "apkUrl": "https://birhan.online/downloads/birhan-1.0.5.apk",
+  "sha256": "011617ca0620b31d76426f922bad5c57304c98233f10564169fb41f6692a37fa",
+  "sizeBytes": 155967351,
+  "releasedAt": "2026-08-27T22:59:12Z",
+  "minSupportedVersionCode": 1,
+  "notes_am": "በሚከፈትበት ጊዜ የሚታየው ጥቁር ስክሪን ተስተካክሏል — መተግበሪያው በቀጥታ ወደ መግቢያ ገጽ ይከፈታል። ምዝገባ አሁን የቴሌግራም መለያዎን ያረጋግጣል፤ ይህም እያንዳንዱ አባል እውነተኛ ሰው መሆኑን ያረጋግጣል። መለያዎን ከ«ተጨማሪ → ቅንብሮች» መሰረዝ ይችላሉ፤ ይህም ብርሃን ከሚያስተዳድራቸው የቤተ ክርስቲያን የቴሌግራም ቡድኖች ያስወጣዎታል።",
+  "notes_en": "Fixes the black screen on launch — the app now opens straight to the sign-in page. Registration now confirms your Telegram account, so every member is a real person. You can delete your account from More → Settings, which also removes you from the church Telegram groups Birhan manages.",
+  "mandatory": false
+}
