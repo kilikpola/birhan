@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -16,7 +16,6 @@ import { useApp } from "@/theme/context";
 import { getLocalDb, runTransactionExclusive, saveReadingPosition } from "@/utils/db";
 import { searchBible, VerseResult } from "@/utils/search";
 import { ThemedText } from "@/components/themed-text";
-import { Cross } from "@/components/cross";
 import { Icon } from "@/components/icon";
 import { toGeezNumeral } from "@/lib/ethiopian";
 import { radius, fonts, space } from "@/theme/tokens";
@@ -24,6 +23,12 @@ import { reportError } from "@/lib/errors";
 import { BibleSkeleton } from "@/components/skeletons/bible-skeleton";
 import { useSkeleton } from "@/lib/use-skeleton";
 import { SectionBoundary } from "@/components/section-boundary";
+import {
+  VerseStudySheets,
+  type StudyPanel,
+  type StudyVerseRef,
+  type NavigateTarget,
+} from "@/components/verse-study/verse-study-sheets";
 
 interface Book {
   id: number;
@@ -67,8 +72,11 @@ export default function BibleScreen() {
   const [searchResults, setSearchResults] = useState<VerseResult[]>([]);
 
   // Selection state (clicked verse)
-  const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
   const [loadingChapter, setLoadingChapter] = useState(false);
+
+  // Long-press verse study (cross-refs / commentary / word study / copy / share)
+  const [studyPanel, setStudyPanel] = useState<"actions" | StudyPanel | null>(null);
+  const [studyVerseNum, setStudyVerseNum] = useState<number | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const pendingPosRef = useRef<{ book: number; chapter: number } | null>(null);
   const savePosTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,16 +232,16 @@ export default function BibleScreen() {
 
   // Handle highlights
   const handleHighlight = async (color: string | null) => {
-    if (!currentBook || selectedVerse === null) return;
+    if (!currentBook || studyVerseNum === null) return;
 
     try {
       const localDb = await getLocalDb();
-      const id = `${currentBook.id}-${currentChapter}-${selectedVerse}`;
+      const id = `${currentBook.id}-${currentChapter}-${studyVerseNum}`;
       await runTransactionExclusive(localDb, async (txn) => {
         if (color) {
           await txn.runAsync(
             "INSERT OR REPLACE INTO highlights (id, book, chapter, verse, color, note, updated_at, synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [id, currentBook.id, currentChapter, selectedVerse, color, null, Date.now(), 0]
+            [id, currentBook.id, currentChapter, studyVerseNum, color, null, Date.now(), 0]
           );
         } else {
           await txn.runAsync("DELETE FROM highlights WHERE id = ?", [id]);
@@ -241,15 +249,15 @@ export default function BibleScreen() {
       });
 
       if (color) {
-        setHighlights(prev => ({ ...prev, [selectedVerse]: color }));
+        setHighlights(prev => ({ ...prev, [studyVerseNum]: color }));
       } else {
         setHighlights(prev => {
           const copy = { ...prev };
-          delete copy[selectedVerse];
+          delete copy[studyVerseNum];
           return copy;
         });
       }
-      setSelectedVerse(null);
+      closeStudySheets();
     } catch (err) {
       reportError(err, "BibleScreen.handleHighlight", lang);
     }
@@ -257,10 +265,10 @@ export default function BibleScreen() {
 
   // Handle Bookmarks
   const toggleBookmark = async () => {
-    if (!currentBook || selectedVerse === null) return;
+    if (!currentBook || studyVerseNum === null) return;
 
-    const isBookmarked = bookmarks.has(selectedVerse);
-    const id = `${currentBook.id}-${currentChapter}-${selectedVerse}`;
+    const isBookmarked = bookmarks.has(studyVerseNum);
+    const id = `${currentBook.id}-${currentChapter}-${studyVerseNum}`;
 
     try {
       const localDb = await getLocalDb();
@@ -270,7 +278,7 @@ export default function BibleScreen() {
         } else {
           await txn.runAsync(
             "INSERT OR REPLACE INTO bookmarks (id, book, chapter, verse, updated_at, synced) VALUES (?, ?, ?, ?, ?, ?)",
-            [id, currentBook.id, currentChapter, selectedVerse, Date.now(), 0]
+            [id, currentBook.id, currentChapter, studyVerseNum, Date.now(), 0]
           );
         }
       });
@@ -278,17 +286,17 @@ export default function BibleScreen() {
       if (isBookmarked) {
         setBookmarks(prev => {
           const copy = new Set(prev);
-          copy.delete(selectedVerse);
+          copy.delete(studyVerseNum);
           return copy;
         });
       } else {
         setBookmarks(prev => {
           const copy = new Set(prev);
-          copy.add(selectedVerse);
+          copy.add(studyVerseNum);
           return copy;
         });
       }
-      setSelectedVerse(null);
+      closeStudySheets();
     } catch (err) {
       reportError(err, "BibleScreen.toggleBookmark", lang);
     }
@@ -316,7 +324,39 @@ export default function BibleScreen() {
       setSearchOpen(false);
       setSearchQuery("");
       setTimeout(() => {
-        setSelectedVerse(result.verse);
+        setStudyVerseNum(result.verse);
+      }, 300);
+    }
+  };
+
+  const studyVerseRef: StudyVerseRef | null = useMemo(() => {
+    if (studyVerseNum === null || !currentBook) return null;
+    const v = verses.find((vv) => vv.verse === studyVerseNum);
+    if (!v) return null;
+    return {
+      book: currentBook.id,
+      bookNameAm: currentBook.name_am,
+      bookNameEn: currentBook.name_en,
+      chapter: currentChapter,
+      verse: studyVerseNum,
+      textAm: v.text_am,
+      textEn: v.text_en,
+    };
+  }, [studyVerseNum, currentBook, currentChapter, verses]);
+
+  const closeStudySheets = () => {
+    setStudyPanel(null);
+    setStudyVerseNum(null);
+  };
+
+  const handleStudyNavigate = (target: NavigateTarget) => {
+    const matchedBook = books.find((b) => b.id === target.book);
+    if (matchedBook) {
+      setCurrentBook(matchedBook);
+      setCurrentChapter(target.chapter);
+      closeStudySheets();
+      setTimeout(() => {
+        setStudyVerseNum(target.verse);
       }, 300);
     }
   };
@@ -361,17 +401,8 @@ export default function BibleScreen() {
       {/* Top Header */}
       <SectionBoundary name="Bible.Nav">
         <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.bg }]}>
-          <TouchableOpacity
-            onPress={() => setSelectorOpen(true)}
-            style={styles.bookSelectorBtn}
-            activeOpacity={0.7}
-          >
-            <ThemedText type="subtitle" colorType="text" style={{ marginRight: 6 }}>
-              {currentBook ? (isAm ? currentBook.name_am : currentBook.name_en) : ""} {currentChapter}
-            </ThemedText>
-            <Icon name="chevron" size={14} color={c.textSoft} />
-          </TouchableOpacity>
-
+          {/* The chapter title lives in the chapter card below, which is the
+              primary selector. Only search sits up here now. */}
           <View style={styles.headerActions}>
             <TouchableOpacity
               onPress={() => setSearchOpen(true)}
@@ -385,23 +416,6 @@ export default function BibleScreen() {
 
       {/* Reader Layout Scroll */}
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.versesContainer}>
-        {/* Offline Badge Row */}
-        <SectionBoundary name="Bible.OfflineBadge">
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-            <View style={[styles.chip, { borderColor: c.accentDim, backgroundColor: c.accentGlow }]}>
-              <Cross size={10} color={c.accent} />
-              <ThemedText type="smallBold" colorType="accent" style={{ marginLeft: 4 }}>
-                ያለ ኢንተርኔት
-              </ThemedText>
-            </View>
-            <View style={[styles.chip, { borderColor: c.border, backgroundColor: c.surface }]}>
-              <ThemedText type="small" colorType="textFaint">
-                0 MB · bundled
-              </ThemedText>
-            </View>
-          </View>
-        </SectionBoundary>
-
         {/* View mode segment switcher */}
         <View style={[styles.seg, { backgroundColor: c.surface, borderColor: c.border }]}>
           {[
@@ -432,14 +446,23 @@ export default function BibleScreen() {
 
         {/* Chapter Title & Navigation Row */}
         <View style={[styles.chapterRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <View style={{ flex: 1 }}>
+          {/* Opening the book picker moved here with the title. This card is
+              now the only chapter header, so it has to carry the job the
+              removed top bar used to do — otherwise the picker is unreachable
+              and you can only step one chapter at a time through 66 books. */}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={0.7}
+            onPress={() => setSelectorOpen(true)}
+            accessibilityRole="button"
+          >
             <ThemedText type="subtitle" colorType="text" isAmharic={true}>
               {currentBook ? (isAm ? currentBook.name_am : currentBook.name_en) : ""} {toGeezNumeral(currentChapter)}
             </ThemedText>
             <ThemedText type="small" colorType="textFaint" style={{ marginTop: 2 }}>
               {currentBook?.name_en} {currentChapter} · {currentBook?.testament === 'OT' ? 'ብሉይ ኪዳን' : 'አዲስ ኪዳን'}
             </ThemedText>
-          </View>
+          </TouchableOpacity>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             <TouchableOpacity
               onPress={prevChapter}
@@ -472,7 +495,7 @@ export default function BibleScreen() {
                   return true;
                 })
                 .map((v) => {
-                  const isSelected = selectedVerse === v.verse;
+                  const isSelected = studyVerseNum === v.verse;
                   const highlightColor = highlights[v.verse];
                   const isBookmarked = bookmarks.has(v.verse);
 
@@ -480,7 +503,10 @@ export default function BibleScreen() {
                     <TouchableOpacity
                       key={v.verse}
                       activeOpacity={0.7}
-                      onPress={() => setSelectedVerse(isSelected ? null : v.verse)}
+                      onPress={() => {
+                        setStudyVerseNum(v.verse);
+                        setStudyPanel("actions");
+                      }}
                       style={[
                         styles.verseItem,
                         isSelected && { backgroundColor: c.surfaceAlt, borderColor: c.accent },
@@ -743,57 +769,23 @@ export default function BibleScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Action Sheet Overlay when Verse Selected */}
-      {selectedVerse !== null && (
-        <SectionBoundary name="Bible.VerseActions" fallback={null}>
-          <View style={[styles.actionPanel, { backgroundColor: c.surface, borderTopColor: c.borderLit }]}>
-            <View style={styles.actionPanelHeader}>
-              <ThemedText type="smallBold" colorType="textFaint">
-                {isAm ? `ቁጥር ${selectedVerse} ምልክት` : `Verse ${selectedVerse} Actions`}
-              </ThemedText>
-              <TouchableOpacity onPress={() => setSelectedVerse(null)}>
-                <Icon name="check" size={16} color={c.accent} />
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.actionRow}>
-              <View style={styles.highlightSelector}>
-                {highlightColors.map((col) => (
-                  <TouchableOpacity
-                    key={col.name}
-                    onPress={() => handleHighlight(col.hex)}
-                    style={[styles.colorBubble, { backgroundColor: col.hex }]}
-                  />
-                ))}
-                {highlights[selectedVerse] && (
-                  <TouchableOpacity
-                    onPress={() => handleHighlight(null)}
-                    style={[styles.colorBubbleClear, { borderColor: c.border }]}
-                  >
-                    <Icon name="check" size={12} color={c.textSoft} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <TouchableOpacity
-                onPress={toggleBookmark}
-                style={[styles.bookmarkBtn, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}
-              >
-                <Icon
-                  name="bookmark"
-                  size={14}
-                  color={bookmarks.has(selectedVerse) ? c.accent : c.textSoft}
-                />
-                <ThemedText type="smallBold" colorType="textSoft" style={{ marginLeft: 6 }}>
-                  {bookmarks.has(selectedVerse)
-                    ? (isAm ? "ዕልባት አጥፋ" : "Unbookmark")
-                    : (isAm ? "ዕልባት አድርግ" : "Bookmark")}
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </SectionBoundary>
-      )}
+      <VerseStudySheets
+        verseRef={studyVerseRef}
+        panel={studyPanel}
+        bibleDb={db}
+        books={books}
+        lang={lang}
+        colors={c}
+        onClose={closeStudySheets}
+        onOpenPanel={(panel) => setStudyPanel(panel)}
+        onNavigate={handleStudyNavigate}
+        highlightColors={highlightColors}
+        activeHighlight={studyVerseNum !== null ? highlights[studyVerseNum] ?? null : null}
+        onHighlight={handleHighlight}
+        isBookmarked={studyVerseNum !== null && bookmarks.has(studyVerseNum)}
+        onToggleBookmark={toggleBookmark}
+      />
     </SafeAreaView>
   );
 }
@@ -802,14 +794,14 @@ const styles = StyleSheet.create({
   outer: { flex: 1 },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    // Search is the only control left up here.
+    justifyContent: "flex-end",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  bookSelectorBtn: { flexDirection: "row", alignItems: "center" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconbtn: {
     width: 36,
@@ -819,14 +811,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-  },
-  chip: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   seg: {
     flexDirection: 'row',
@@ -912,20 +896,5 @@ const styles = StyleSheet.create({
   searchResultsContainer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
   searchResultItem: { paddingVertical: 12, borderBottomWidth: 1 },
   searchEmptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  actionPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopWidth: 1,
-    padding: 16,
-    paddingBottom: 24,
-  },
-  actionPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  highlightSelector: { flexDirection: 'row', gap: 8 },
-  colorBubble: { width: 28, height: 28, borderRadius: 14 },
-  colorBubbleClear: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   actionBtn: { padding: 6 },
-  bookmarkBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderRadius: radius.pill },
 });

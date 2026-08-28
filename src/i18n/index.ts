@@ -168,6 +168,8 @@ export const am = {
   actionWordStudy: 'የቃል ጥናት',
   actionCopy: 'ቅዳ',
   actionShare: 'አጋራ',
+  actionBookmark: 'ዕልባት አድርግ',
+  actionUnbookmark: 'ዕልባት አጥፋ',
   copiedToClipboard: 'ተቀድቷል',
 
   // Cross-references
@@ -476,6 +478,8 @@ export const en: Record<keyof typeof am, string> = {
   actionWordStudy: 'Word study',
   actionCopy: 'Copy',
   actionShare: 'Share',
+  actionBookmark: 'Bookmark',
+  actionUnbookmark: 'Unbookmark',
   copiedToClipboard: 'Copied',
 
   // Cross-references
