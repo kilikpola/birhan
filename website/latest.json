@@ -1,12 +1,12 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
-  "apkUrl": "https://birhan.online/downloads/birhan-1.0.5.apk",
-  "sha256": "011617ca0620b31d76426f922bad5c57304c98233f10564169fb41f6692a37fa",
-  "sizeBytes": 155967351,
-  "releasedAt": "2026-08-27T22:59:12Z",
+  "versionCode": 7,
+  "versionName": "1.0.6",
+  "apkUrl": "https://birhan.online/downloads/birhan-1.0.6.apk",
+  "sha256": "cab528eb5c0be2ab386fc84b7eac95a6cb9542d3f5778ebb84f5e59e71e762d0",
+  "sizeBytes": 155967911,
+  "releasedAt": "2026-08-28T10:19:26Z",
   "minSupportedVersionCode": 1,
-  "notes_am": "በሚከፈትበት ጊዜ የሚታየው ጥቁር ስክሪን ተስተካክሏል — መተግበሪያው በቀጥታ ወደ መግቢያ ገጽ ይከፈታል። ምዝገባ አሁን የቴሌግራም መለያዎን ያረጋግጣል፤ ይህም እያንዳንዱ አባል እውነተኛ ሰው መሆኑን ያረጋግጣል። መለያዎን ከ«ተጨማሪ → ቅንብሮች» መሰረዝ ይችላሉ፤ ይህም ብርሃን ከሚያስተዳድራቸው የቤተ ክርስቲያን የቴሌግራም ቡድኖች ያስወጣዎታል።",
-  "notes_en": "Fixes the black screen on launch — the app now opens straight to the sign-in page. Registration now confirms your Telegram account, so every member is a real person. You can delete your account from More → Settings, which also removes you from the church Telegram groups Birhan manages.",
-  "mandatory": false
+  "notes_am": "አስፈላጊ ጥገና፦ መግባትና መመዝገብ አሁን ይሠራሉ። ከዚህ በፊት «መለያዎ ተፈጥሯል» ብሎ የሚቆመው ችግር ተስተካክሏል — መለያዎ ተፈጥሮ የነበረ ቢሆንም መተግበሪያው ሊያስገባዎት አልቻለም ነበር። አሁን ከገቡ በኋላ መተግበሪያውን ዘግተው ቢከፍቱም ውስጥ ሆነው ይቀጥላሉ።",
+  "notes_en": "Important fix: signing in and registering now work. Previously the app could stop at “your account was created” — the account really was created, but the app could not sign you in. Your session now survives closing and reopening the app.",
+  "mandatory": true
 }
