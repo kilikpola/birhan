@@ -1,12 +1,12 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
-  "apkUrl": "https://birhan.online/downloads/birhan-1.0.6.apk",
-  "sha256": "cab528eb5c0be2ab386fc84b7eac95a6cb9542d3f5778ebb84f5e59e71e762d0",
-  "sizeBytes": 155967911,
-  "releasedAt": "2026-08-28T10:19:26Z",
+  "versionCode": 8,
+  "versionName": "1.0.7",
+  "apkUrl": "https://birhan.online/downloads/birhan-1.0.7.apk",
+  "sha256": "f909af8ad39e680ef462670ede861b2757f6d9cb5edb647dfa7cbc236990300c",
+  "sizeBytes": 155967163,
+  "releasedAt": "2026-08-28T19:05:37Z",
   "minSupportedVersionCode": 1,
-  "notes_am": "አስፈላጊ ጥገና፦ መግባትና መመዝገብ አሁን ይሠራሉ። ከዚህ በፊት «መለያዎ ተፈጥሯል» ብሎ የሚቆመው ችግር ተስተካክሏል — መለያዎ ተፈጥሮ የነበረ ቢሆንም መተግበሪያው ሊያስገባዎት አልቻለም ነበር። አሁን ከገቡ በኋላ መተግበሪያውን ዘግተው ቢከፍቱም ውስጥ ሆነው ይቀጥላሉ።",
-  "notes_en": "Important fix: signing in and registering now work. Previously the app could stop at “your account was created” — the account really was created, but the app could not sign you in. Your session now survives closing and reopening the app.",
-  "mandatory": true
+  "notes_am": "የመጽሐፍ ቅዱስ ንባብ ገጽ ጸዳ ተደረገ፦ የተደገመው የምዕራፍ ርዕስና አላስፈላጊ ምልክቶች ተነሱ። አሁን ጥቅስ ላይ አንዴ ብቻ ነካ ሲያደርጉ ማብራሪያ፣ ተመሳሳይ ጥቅሶች፣ የቃል ጥናት፣ ማድመቂያና ዕልባት በአንድ ቦታ ይመጣሉ — ከዚህ በፊት ተጭነው መያዝ ይጠይቅ ነበር።",
+  "notes_en": "A cleaner Bible reading screen: the duplicated chapter heading and the status chips are gone. Tapping a verse once now opens commentary, cross-references, word study, highlighting and bookmarks together in one sheet — previously the study tools needed a long press.",
+  "mandatory": false
 }
