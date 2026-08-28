@@ -5,7 +5,7 @@ export type IconName =
   | 'book' | 'note' | 'menu' | 'search' | 'play' | 'pause' | 'prev' | 'next'
   | 'down' | 'check' | 'wifiOff' | 'chevron' | 'chev' | 'back' | 'sun' | 'moon' | 'church'
   | 'globe' | 'user' | 'bookmark' | 'share' | 'reply' | 'lock' | 'send'
-  | 'gear' | 'plus' | 'eyeOff';
+  | 'gear' | 'plus' | 'eyeOff' | 'eye' | 'link' | 'quote' | 'tag' | 'copy' | 'alert';
 
 export interface IconProps {
   name: IconName;
@@ -189,6 +189,49 @@ export const Icon: React.FC<IconProps> = ({ name, size = 20, color = 'currentCol
       return (
         <Svg {...commonProps}>
           <Path d="M12 5v14M5 12h14" />
+        </Svg>
+      );
+    case 'link':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M10 14a5 5 0 007.07 0l1.93-1.93a5 5 0 00-7.07-7.07L10.5 6.5" />
+          <Path d="M14 10a5 5 0 00-7.07 0L5 11.93a5 5 0 007.07 7.07L13.5 17.5" />
+        </Svg>
+      );
+    case 'quote':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M7 8c-2 1-3 3-3 5.5S5.5 17 8 17s3.5-1.5 3.5-3.5S10 10 8 10c0-1.2 1-2.2 2-2.5" />
+          <Path d="M16 8c-2 1-3 3-3 5.5s1.5 3.5 4 3.5 3.5-1.5 3.5-3.5S19 10 17 10c0-1.2 1-2.2 2-2.5" />
+        </Svg>
+      );
+    case 'tag':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M3 12.5L11.5 4H19a1 1 0 011 1v7.5l-8.5 8.5a2 2 0 01-2.8 0l-5.2-5.2a2 2 0 010-2.8z" />
+          <Circle cx="15.5" cy="8.5" r="1.4" />
+        </Svg>
+      );
+    case 'copy':
+      return (
+        <Svg {...commonProps}>
+          <Rect x="9" y="9" width="11" height="11" rx="2" />
+          <Path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+        </Svg>
+      );
+    case 'alert':
+      return (
+        <Svg {...commonProps}>
+          <Circle cx="12" cy="12" r="9" />
+          <Path d="M12 8v5" />
+          <Circle cx="12" cy="16" r="0.5" fill={color} />
+        </Svg>
+      );
+    case 'eye':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <Circle cx="12" cy="12" r="3" />
         </Svg>
       );
     case 'eyeOff':
