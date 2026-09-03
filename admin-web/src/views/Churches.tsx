@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { supabase, type Church } from '../supabase';
+import { apiFetch } from '../api';
+import type { Church } from '../types';
+import { useI18n, t } from '../i18n';
 
 export function Churches() {
+  const { lang } = useI18n();
   const [rows, setRows] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -9,13 +12,12 @@ export function Churches() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
-        .from('churches')
-        .select('*')
-        .order('member_count', { ascending: false })
-        .limit(500);
-      if (error) setErr(error.message);
-      else setRows((data as Church[]) ?? []);
+      try {
+        const data = await apiFetch<{ churches: Church[] }>('/api/v1/admin/churches');
+        setRows(data.churches ?? []);
+      } catch (e: any) {
+        setErr(e.message ?? String(e));
+      }
       setLoading(false);
     })();
   }, []);
@@ -24,8 +26,8 @@ export function Churches() {
     if (!q.trim()) return true;
     const s = q.toLowerCase();
     return (
-      c.name_en?.toLowerCase().includes(s) ||
-      c.name_am?.includes(q) ||
+      c.nameEn?.toLowerCase().includes(s) ||
+      c.nameAm?.includes(q) ||
       (c.city ?? '').toLowerCase().includes(s) ||
       (c.denomination ?? '').toLowerCase().includes(s)
     );
@@ -35,39 +37,39 @@ export function Churches() {
     <div>
       <div className="page-head">
         <div>
-          <div className="eyebrow">Directory</div>
-          <h1>Churches</h1>
-          <p>Every church registered on the platform, busiest first.</p>
+          <div className="eyebrow">{t(lang, 'churchList')}</div>
+          <h1 className="serif">{t(lang, 'churches')}</h1>
+          <p>{t(lang, 'everyChurch')}</p>
         </div>
         <input
           style={{ maxWidth: 240 }}
-          placeholder="Search name, city, denomination…"
+          placeholder={t(lang, 'searchPlaceholder')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
 
-      {err && <div className="banner">Couldn't load churches: {err}</div>}
+      {err && <div className="banner">{t(lang, 'couldNotLoad')}: {err}</div>}
 
       {loading ? (
-        <div className="loading">Loading…</div>
+        <div className="loading">{t(lang, 'loading')}</div>
       ) : filtered.length === 0 ? (
-        <div className="empty">No churches match “{q}”.</div>
+        <div className="empty">{t(lang, 'noChurches').replace('%s', q)}</div>
       ) : (
         <div className="rows">
           {filtered.map((c) => (
             <div className="row" key={c.id}>
               <div>
-                <div className="who-name serif">{c.name_am}</div>
+                <div className="who-name serif">{c.nameAm}</div>
                 <div className="who-meta">
-                  <b>{c.name_en}</b>
+                  <b>{c.nameEn}</b>
                   {c.denomination ? ` · ${c.denomination}` : ''}
                   {c.city ? ` · ${c.city}` : ''}
                 </div>
               </div>
               <div className="row-actions">
-                {c.telegram_chat_id ? <span className="chip approved">Telegram linked</span> : null}
-                <span className="chip role tnum">{c.member_count} members</span>
+                {c.telegramChatId ? <span className="chip approved">{t(lang, 'telegramLinked')}</span> : null}
+                <span className="chip role tnum">{c.memberCount} {t(lang, 'memberCount')}</span>
               </div>
             </div>
           ))}

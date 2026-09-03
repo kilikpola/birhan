@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
+import { useI18n, t } from '../i18n';
 
 export function Login({ unauthorized }: { unauthorized?: boolean }) {
   const { signIn, signOut } = useAuth();
+  const { lang } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,20 +24,21 @@ export function Login({ unauthorized }: { unauthorized?: boolean }) {
       <div className="login-wrap">
         <div className="login-card">
           <img className="login-logo" src="/birhanlogo.png" alt="Birhan" />
-          <div className="login-sub">Admin</div>
+          <div className="login-sub">{t(lang, 'admin')}</div>
           <p className="login-title" style={{ marginTop: 22 }}>
-            This account is signed in, but it isn't a <b style={{ color: 'var(--gold)' }}>super&nbsp;admin</b>.
-            The console is limited to platform administrators.
+            {t(lang, 'accessDeniedBefore')}
+            <b style={{ color: 'var(--accent)' }}>{t(lang, 'accessDeniedRole')}</b>
+            {t(lang, 'accessDeniedAfter')}
           </p>
           <button className="btn btn-ghost" style={{ width: '100%' }} onClick={() => signOut()}>
-            Sign out
+            {t(lang, 'signOut')}
           </button>
           <p className="note">
-            To grant access, run in Supabase SQL:<br />
-            <code style={{ color: 'var(--ink-soft)' }}>
-              update profiles set role='super_admin' where id='…';
+            {t(lang, 'accessDeniedNote')}<br />
+            <code style={{ color: 'var(--text-soft)' }}>
+              {t(lang, 'superAdmin')}
             </code>
-            <br />then sign out and back in so the JWT re-stamps.
+            <br />{t(lang, 'thenSignOut')}
           </p>
         </div>
       </div>
@@ -46,22 +49,22 @@ export function Login({ unauthorized }: { unauthorized?: boolean }) {
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
         <img className="login-logo" src="/birhanlogo.png" alt="Birhan" />
-        <div className="login-sub">Admin Console</div>
-        <p className="login-title">Sign in with your super-admin account</p>
+        <div className="login-sub">{t(lang, 'signInSubtitle')}</div>
+        <p className="login-title">{t(lang, 'signInTitle')}</p>
 
         <label className="field">
-          <span>Email</span>
+          <span>{t(lang, 'email')}</span>
           <input
             type="email"
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@birhan.app"
+            placeholder="you@birhan.online"
             required
           />
         </label>
         <label className="field">
-          <span>Password</span>
+          <span>{t(lang, 'password')}</span>
           <input
             type="password"
             autoComplete="current-password"
@@ -73,10 +76,10 @@ export function Login({ unauthorized }: { unauthorized?: boolean }) {
         </label>
 
         <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? t(lang, 'signingIn') : t(lang, 'signIn')}
         </button>
         {err && <div className="err">{err}</div>}
-        <p className="note">Access is enforced by Supabase row-level security, not by this page.</p>
+        <p className="note">{t(lang, 'signInNote')}</p>
       </form>
     </div>
   );

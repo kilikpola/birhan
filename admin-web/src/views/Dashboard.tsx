@@ -1,34 +1,18 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../supabase';
+import { apiFetch } from '../api';
+import type { PlatformStats } from '../types';
+import { useI18n, t } from '../i18n';
 
-type Counts = { churches: number; members: number; pastors: number; pending: number };
-
-export function Dashboard({ goVerify }: { goVerify: () => void }) {
-  const [c, setC] = useState<Counts | null>(null);
+export function Dashboard({ goVerify, goRequests }: { goVerify: () => void; goRequests: () => void }) {
+  const { lang } = useI18n();
+  const [c, setC] = useState<PlatformStats | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        // Big-table tiles (churches, members) use an O(1) planner ESTIMATE —
-        // exact count(*) on a 100M-row profiles table is a full scan every load.
-        // Small, indexed sets (verified pastors, pending) stay exact: the
-        // partial indexes make them index lookups, not scans.
-        const head = { count: 'exact' as const, head: true };
-        const [est, pastors, pending] = await Promise.all([
-          supabase.rpc('platform_estimated_counts'),
-          supabase.from('profiles').select('*', head).eq('role', 'pastor'),
-          supabase.from('profiles').select('*', head).eq('pastor_status', 'pending'),
-        ]);
-        const firstErr = [est, pastors, pending].find((r) => r.error)?.error;
-        if (firstErr) throw firstErr;
-        const row = Array.isArray(est.data) ? est.data[0] : est.data;
-        setC({
-          churches: Number(row?.churches ?? 0),
-          members: Number(row?.members ?? 0),
-          pastors: pastors.count ?? 0,
-          pending: pending.count ?? 0,
-        });
+        const data = await apiFetch<PlatformStats>('/api/v1/admin/stats');
+        setC(data);
       } catch (e: any) {
         setErr(e.message ?? String(e));
       }
@@ -39,44 +23,64 @@ export function Dashboard({ goVerify }: { goVerify: () => void }) {
     <div>
       <div className="page-head">
         <div>
-          <div className="eyebrow">Overview</div>
-          <h1>Platform at a glance</h1>
-          <p>Live counts across every church on Birhan.</p>
+          <div className="eyebrow">{t(lang, 'overview')}</div>
+          <h1 className="serif">{t(lang, 'platformGlance')}</h1>
+          <p>{t(lang, 'liveCounts')}</p>
         </div>
       </div>
 
-      {err && <div className="banner">Couldn't load stats: {err}</div>}
+      {err && <div className="banner">{t(lang, 'couldNotLoad')}: {err}</div>}
 
       <div className="stats">
         <div className="stat">
-          <div className="k tnum">{c ? c.churches : '—'}</div>
-          <div className="l">Churches</div>
+          <div className="k tnum serif">{c ? c.churches : '—'}</div>
+          <div className="l">{t(lang, 'churches')}</div>
         </div>
         <div className="stat">
-          <div className="k tnum">{c ? '≈ ' + c.members.toLocaleString() : '—'}</div>
-          <div className="l">Members (estimated)</div>
+          <div className="k tnum serif">{c ? c.members.toLocaleString() : '—'}</div>
+          <div className="l">{t(lang, 'members')}</div>
         </div>
         <div className="stat">
-          <div className="k tnum">{c ? c.pastors : '—'}</div>
-          <div className="l">Verified pastors</div>
+          <div className="k tnum serif">{c ? c.pastors : '—'}</div>
+          <div className="l">{t(lang, 'verifiedPastors')}</div>
         </div>
         <div className={'stat' + (c && c.pending > 0 ? ' alert' : '')}>
-          <div className="k tnum">{c ? c.pending : '—'}</div>
-          <div className="l">Pastors awaiting review</div>
+          <div className="k tnum serif">{c ? c.pending : '—'}</div>
+          <div className="l">{t(lang, 'pendingReview')}</div>
+        </div>
+        <div className={'stat' + (c && c.pendingChurchRequests > 0 ? ' alert' : '')}>
+          <div className="k tnum serif">{c ? c.pendingChurchRequests : '—'}</div>
+          <div className="l">{t(lang, 'pendingChurchRequests')}</div>
         </div>
       </div>
 
       {c && c.pending > 0 && (
-        <div className="row" style={{ borderColor: 'color-mix(in srgb, var(--amber) 40%, transparent)' }}>
+        <div className="row" style={{ borderColor: 'color-mix(in srgb, var(--accent) 40%, transparent)' }}>
           <div>
-            <div className="who-name">
-              {c.pending} pastor{c.pending > 1 ? 's are' : ' is'} waiting to be verified
+            <div className="who-name serif">
+              {c.pending} {t(lang, 'pastorAwaitingReview')}
             </div>
-            <div className="who-meta">Review their documents and approve or reject.</div>
+            <div className="who-meta">{t(lang, 'reviewDocsApprove')}</div>
           </div>
           <div className="row-actions">
             <button className="btn btn-primary" style={{ width: 'auto' }} onClick={goVerify}>
-              Open the queue →
+              {t(lang, 'openQueue')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {c && c.pendingChurchRequests > 0 && (
+        <div className="row" style={{ borderColor: 'color-mix(in srgb, var(--accent) 40%, transparent)' }}>
+          <div>
+            <div className="who-name serif">
+              {c.pendingChurchRequests} {t(lang, 'churchRequestsAwaiting')}
+            </div>
+            <div className="who-meta">{t(lang, 'reviewChurchRequests')}</div>
+          </div>
+          <div className="row-actions">
+            <button className="btn btn-primary" style={{ width: 'auto' }} onClick={goRequests}>
+              {t(lang, 'openRequests')}
             </button>
           </div>
         </div>
