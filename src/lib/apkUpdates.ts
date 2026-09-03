@@ -1,10 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import * as Crypto from 'expo-crypto';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isNetworkAllowedForDownload } from './otaUpdates';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { base64ToBytes } from './base64';
 import { reportError } from './errors';
 
 export const DEFAULT_MANIFEST_URL = 'https://updates.birhan.online/birhan/latest.json';
@@ -53,107 +53,229 @@ export function isValidHttpsUrl(urlString: string): boolean {
 }
 
 /**
- * Returns current installed application's versionCode.
+ * The versionCode of the binary that is actually running.
+ *
+ * Read from the installed package first, and only then from app.json. Those two
+ * disagree more often than one would like: app.json is a build *input*, and
+ * `assembleRelease` does not re-run prebuild, so a bumped app.json can sit in a
+ * binary that was compiled from the older android/app/build.gradle. When they
+ * disagree, app.json is the number that is wrong, and trusting it makes the app
+ * believe it is newer than it is — so it never offers the update that would fix
+ * it. The package manager cannot be out of date about itself.
  */
 export function getCurrentVersionCode(): number {
-  if (Constants.expoConfig?.android?.versionCode) {
-    return Constants.expoConfig.android.versionCode;
-  }
   const buildVer = Application.nativeBuildVersion;
   if (buildVer) {
     const parsed = parseInt(buildVer, 10);
     if (!isNaN(parsed) && parsed > 0) return parsed;
   }
-  return 1; // Default fallback for dev environment
+  if (Constants.expoConfig?.android?.versionCode) {
+    return Constants.expoConfig.android.versionCode;
+  }
+  return 1; // Only reached in dev, where there is no installed package.
+}
+
+/** The versionName of the running binary, for display ("1.0.7"). */
+export function getCurrentVersionName(): string {
+  return (
+    Application.nativeApplicationVersion ||
+    Constants.expoConfig?.version ||
+    '0.0.0'
+  );
+}
+
+/**
+ * How long to wait between unattended checks. A manual check ignores this
+ * entirely — see `checkForApkUpdate({ force: true })`.
+ */
+export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** When the last *completed* check happened, or null if there has never been one. */
+export async function getLastCheckTime(): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_APK_CHECK_KEY);
+    if (!raw) return null;
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? null : parsed;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Checks if 24 hours have passed since the last APK manifest check.
  */
 export async function shouldCheckApkUpdate(): Promise<boolean> {
-  try {
-    const lastCheckStr = await AsyncStorage.getItem(LAST_APK_CHECK_KEY);
-    if (!lastCheckStr) return true;
-    const lastCheckTime = parseInt(lastCheckStr, 10);
-    if (isNaN(lastCheckTime)) return true;
-    const now = Date.now();
-    const elapsedMs = now - lastCheckTime;
-    return elapsedMs >= 24 * 60 * 60 * 1000; // 24 hours
-  } catch {
-    return true;
-  }
+  const last = await getLastCheckTime();
+  if (last === null) return true;
+  return Date.now() - last >= CHECK_INTERVAL_MS;
 }
 
+/** Why a check produced no answer. Never conflate these with "up to date". */
+export type ApkCheckFailure =
+  | 'offline'      // the request never completed
+  | 'server'       // the server answered, but not with a manifest
+  | 'malformed'    // it answered with something that is not a usable manifest
+  | 'bad-url';     // refused before asking — not HTTPS, or a raw IP
+
 /**
- * Fetches the APK update manifest from the specified HTTPS URL.
- * Rate-limited to at most once per 24 hours unless forceCheck is true.
- * Never throws — returns null if unreachable or invalid.
+ * The outcome of a check.
+ *
+ * This is a union rather than `ApkUpdateInfo | null` on purpose. The old
+ * signature returned null for six different situations — throttled, offline,
+ * a 404, malformed JSON, a non-HTTPS apkUrl, and genuinely-up-to-date — so the
+ * screen could not tell "we could not ask" from "there is nothing to install",
+ * and showed the reassuring one either way.
  */
-export async function fetchApkManifest(
-  manifestUrl: string = DEFAULT_MANIFEST_URL,
-  forceCheck: boolean = false
-): Promise<ApkUpdateInfo | null> {
+export type ApkCheckResult =
+  | { status: 'update-available'; info: ApkUpdateInfo; checkedAt: number }
+  | { status: 'up-to-date'; manifest: ApkManifest; checkedAt: number }
+  | { status: 'throttled'; lastCheckedAt: number }
+  | { status: 'failed'; reason: ApkCheckFailure };
+
+/**
+ * Asks the update server what the newest build is.
+ *
+ * Never throws, and never blocks: callers fire it and render whatever comes
+ * back. `force` skips the 24-hour throttle — that is what the Settings button
+ * uses, and it is the only way a user can make the app look.
+ */
+export async function checkForApkUpdate(
+  options: { force?: boolean; manifestUrl?: string } = {}
+): Promise<ApkCheckResult> {
+  const { force = false, manifestUrl = DEFAULT_MANIFEST_URL } = options;
+
   if (!isValidHttpsUrl(manifestUrl)) {
-    console.warn(`[APKUpdate] Refusing invalid or non-HTTPS URL: ${manifestUrl}`);
-    return null;
+    reportError(
+      new Error(`Refusing invalid or non-HTTPS manifest URL: ${manifestUrl}`),
+      'ApkUpdates.checkForApkUpdate',
+      'am',
+      false
+    );
+    return { status: 'failed', reason: 'bad-url' };
   }
 
-  if (!forceCheck) {
-    const shouldCheck = await shouldCheckApkUpdate();
-    if (!shouldCheck) return null;
+  if (!force) {
+    const last = await getLastCheckTime();
+    if (last !== null && Date.now() - last < CHECK_INTERVAL_MS) {
+      return { status: 'throttled', lastCheckedAt: last };
+    }
   }
 
+  let response: Response;
   try {
-    const response = await fetch(manifestUrl, {
+    response = await fetch(manifestUrl, {
       method: 'GET',
       headers: { Accept: 'application/json' },
     });
-
-    if (!response.ok) return null;
-
-    const manifest: ApkManifest = await response.json();
-
-    // Store last check timestamp
-    await AsyncStorage.setItem(LAST_APK_CHECK_KEY, Date.now().toString());
-
-    if (!manifest || typeof manifest.versionCode !== 'number') return null;
-
-    // Validate inner apkUrl is also strictly HTTPS
-    if (!isValidHttpsUrl(manifest.apkUrl)) {
-      console.warn(`[APKUpdate] Manifest contained invalid or non-HTTPS apkUrl: ${manifest.apkUrl}`);
-      return null;
-    }
-
-    const currentCode = getCurrentVersionCode();
-    const isUpdateAvailable = manifest.versionCode > currentCode;
-    const isUnsupported = manifest.minSupportedVersionCode > currentCode;
-    const isMandatory = manifest.mandatory || isUnsupported;
-
-    return {
-      manifest,
-      isUpdateAvailable,
-      isMandatory,
-      isUnsupported,
-    };
   } catch (err) {
-    // Non-blocking log — app continues normally
-    reportError(err, 'ApkUpdates.fetchApkManifest', 'am', false);
-    return null;
+    // A failed request is not an answer, and must not be recorded as a check —
+    // otherwise one flaky moment buys 24 hours of silence.
+    reportError(err, 'ApkUpdates.checkForApkUpdate.fetch', 'am', false);
+    return { status: 'failed', reason: 'offline' };
   }
+
+  if (!response.ok) {
+    reportError(
+      new Error(`Update manifest returned HTTP ${response.status}`),
+      'ApkUpdates.checkForApkUpdate.status',
+      'am',
+      false
+    );
+    return { status: 'failed', reason: 'server' };
+  }
+
+  let manifest: ApkManifest;
+  try {
+    manifest = await response.json();
+  } catch (err) {
+    reportError(err, 'ApkUpdates.checkForApkUpdate.parse', 'am', false);
+    return { status: 'failed', reason: 'malformed' };
+  }
+
+  // Validate before recording the check, so a broken manifest does not silence
+  // the next 24 hours' worth of attempts.
+  if (!manifest || typeof manifest.versionCode !== 'number') {
+    reportError(
+      new Error('Update manifest has no numeric versionCode'),
+      'ApkUpdates.checkForApkUpdate.validate',
+      'am',
+      false
+    );
+    return { status: 'failed', reason: 'malformed' };
+  }
+
+  if (!isValidHttpsUrl(manifest.apkUrl)) {
+    reportError(
+      new Error(`Manifest contained invalid or non-HTTPS apkUrl: ${manifest.apkUrl}`),
+      'ApkUpdates.checkForApkUpdate.apkUrl',
+      'am',
+      false
+    );
+    return { status: 'failed', reason: 'malformed' };
+  }
+
+  const checkedAt = Date.now();
+  try {
+    await AsyncStorage.setItem(LAST_APK_CHECK_KEY, checkedAt.toString());
+  } catch {
+    // Losing the timestamp only costs an extra check later.
+  }
+
+  const currentCode = getCurrentVersionCode();
+  // Integer comparison on versionCode. Deliberately never versionName, which is
+  // a display string where "1.0.10" sorts below "1.0.9".
+  const isUpdateAvailable = manifest.versionCode > currentCode;
+  const isUnsupported = manifest.minSupportedVersionCode > currentCode;
+  const isMandatory = Boolean(manifest.mandatory) || isUnsupported;
+
+  if (!isUpdateAvailable) {
+    return { status: 'up-to-date', manifest, checkedAt };
+  }
+
+  return {
+    status: 'update-available',
+    info: { manifest, isUpdateAvailable, isMandatory, isUnsupported },
+    checkedAt,
+  };
 }
 
 /**
- * Computes the SHA-256 hash of a local file.
+ * Bytes read per round trip when hashing. A multiple of 3 so each chunk is a
+ * whole number of base64 groups.
+ */
+const HASH_CHUNK_BYTES = 3 * 1024 * 1024;
+
+/**
+ * SHA-256 of a file's contents.
+ *
+ * Two things here are load-bearing. It hashes the *bytes* of the file, not the
+ * base64 text those bytes arrive in — the previous version hashed the text,
+ * which cannot equal the digest in the manifest, so verification failed for
+ * every download ever attempted and the APK was deleted as "corrupt" each time.
+ * And it reads in chunks: the APK is ~150 MB, and pulling that into a single JS
+ * string as base64 costs roughly 200 MB of heap before hashing even starts.
  */
 export async function computeFileSha256(fileUri: string): Promise<string> {
-  const content = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const hash = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    content
-  );
-  return hash.toLowerCase();
+  const info = await FileSystem.getInfoAsync(fileUri);
+  if (!info.exists) throw new Error(`Cannot hash missing file: ${fileUri}`);
+
+  const total = info.size ?? 0;
+  const hasher = sha256.create();
+
+  for (let position = 0; position < total; position += HASH_CHUNK_BYTES) {
+    const length = Math.min(HASH_CHUNK_BYTES, total - position);
+    const chunk = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+      position,
+      length,
+    });
+    hasher.update(base64ToBytes(chunk));
+  }
+
+  return Array.from(hasher.digest())
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -162,7 +284,12 @@ export async function computeFileSha256(fileUri: string): Promise<string> {
  */
 export async function downloadAndVerifyApk(
   manifest: ApkManifest,
-  onProgress?: (progressPercent: number, downloadedBytes: number) => void
+  onProgress?: (progressPercent: number, downloadedBytes: number) => void,
+  /**
+   * Called once the bytes are all down and hashing starts. Hashing ~150 MB is
+   * not instant, and without this the progress bar sits at 100% looking hung.
+   */
+  onVerifying?: () => void
 ): Promise<{ fileUri: string }> {
   if (!isValidHttpsUrl(manifest.apkUrl)) {
     throw new Error('APK URL is invalid or not HTTPS.');
@@ -175,6 +302,7 @@ export async function downloadAndVerifyApk(
   const fileInfo = await FileSystem.getInfoAsync(destinationUri);
   if (fileInfo.exists) {
     // Check hash of existing file
+    onVerifying?.();
     const existingHash = await computeFileSha256(destinationUri);
     if (existingHash.toLowerCase() === manifest.sha256.toLowerCase()) {
       return { fileUri: destinationUri };
@@ -207,6 +335,7 @@ export async function downloadAndVerifyApk(
     }
 
     // SHA-256 Hash Verification (SECURITY REQUIREMENT)
+    onVerifying?.();
     const computedHash = await computeFileSha256(result.uri);
     if (computedHash.toLowerCase() !== manifest.sha256.toLowerCase()) {
       // SECURITY VIOLATION: Delete invalid file immediately

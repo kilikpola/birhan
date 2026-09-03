@@ -16,8 +16,8 @@ import { radius, space, fonts } from "@/theme/tokens";
 import { SectionBoundary } from "@/components/section-boundary";
 import { reportError } from "@/lib/errors";
 import Constants from "expo-constants";
-import { fetchApkManifest, downloadAndVerifyApk, cancelApkDownload, launchApkInstaller, ApkUpdateInfo } from "@/lib/apkUpdates";
-import { getAllowMobileData, setAllowMobileData, isNetworkAllowedForDownload, initOtaUpdateListener } from "@/lib/otaUpdates";
+import { UpdateSection } from "@/components/settings/update-section";
+import { initOtaUpdateListener } from "@/lib/otaUpdates";
 
 export default function MoreScreen() {
   const { c, night: isNight, setNight, lang: locale, setLang: setLocale } = useApp();
@@ -97,107 +97,11 @@ export default function MoreScreen() {
     return isAm ? "አባል" : "Member";
   };
 
-  // Update States
-  const [apkUpdate, setApkUpdate] = useState<ApkUpdateInfo | null>(null);
-  const [allowMobileData, setAllowMobileDataState] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadedFileUri, setDownloadedFileUri] = useState<string | null>(null);
-
   useEffect(() => {
-    getAllowMobileData().then(setAllowMobileDataState);
-
-    // Lazily check for APK manifest (once per 24 hours)
-    fetchApkManifest().then((info) => {
-      if (info?.isUpdateAvailable) {
-        setApkUpdate(info);
-      }
-    });
-
-    // Path A: Check OTA JS updates in background
+    // OTA (JS-only) patches, in the background. Fire-and-forget: nothing here
+    // is awaited, so an unreachable update server cannot delay the screen.
     initOtaUpdateListener();
   }, []);
-
-  const handleToggleMobileData = async () => {
-    const nextVal = !allowMobileData;
-    setAllowMobileDataState(nextVal);
-    await setAllowMobileData(nextVal);
-  };
-
-  const handleStartApkDownload = async () => {
-    if (!apkUpdate?.manifest) return;
-
-    // Mobile data warning check
-    const isAllowed = await isNetworkAllowedForDownload();
-    if (!isAllowed) {
-      Alert.alert(
-        isAm ? 'ማሳሰቢያ' : 'Notice',
-        t(locale, 'mobileDataWarning').replace('%1', (apkUpdate.manifest.sizeBytes / (1024 * 1024)).toFixed(1)),
-        [
-          { text: isAm ? 'ሰርዝ' : 'Cancel', style: 'cancel' },
-          {
-            text: isAm ? 'ቀጥል' : 'Continue',
-            onPress: () => {
-              setAllowMobileData(true);
-              setAllowMobileDataState(true);
-              executeDownload();
-            },
-          },
-        ]
-      );
-      return;
-    }
-
-    executeDownload();
-  };
-
-  const executeDownload = async () => {
-    if (!apkUpdate?.manifest) return;
-    setDownloading(true);
-    setDownloadProgress(0);
-
-    try {
-      const res = await downloadAndVerifyApk(apkUpdate.manifest, (progress) => {
-        setDownloadProgress(progress);
-      });
-      setDownloadedFileUri(res.fileUri);
-      setDownloading(false);
-      
-      // Prompt user to launch Android installer
-      Alert.alert(
-        isAm ? 'ማሻሻያው ተዘጋጅቷል' : 'Update Ready',
-        t(locale, 'installPermissionGuide'),
-        [
-          {
-            text: t(locale, 'btnInstallApk'),
-            onPress: () => launchApkInstaller(res.fileUri),
-          },
-        ]
-      );
-    } catch (err: any) {
-      setDownloading(false);
-      setDownloadProgress(0);
-      reportError(err, 'Explore.downloadApk', 'am', false);
-      Alert.alert(
-        isAm ? 'ስህተት' : 'Error',
-        err?.message?.includes('SHA-256') ? t(locale, 'errHashMismatch') : t(locale, 'errGeneric')
-      );
-    }
-  };
-
-  const handleCancelDownload = async () => {
-    await cancelApkDownload();
-    setDownloading(false);
-    setDownloadProgress(0);
-  };
-
-  const handleInstallClick = () => {
-    if (downloadedFileUri) {
-      launchApkInstaller(downloadedFileUri);
-    } else {
-      handleStartApkDownload();
-    }
-  };
 
   const currentChurchDisplay = isAm ? (churchNameAm || churchNameEn) : (churchNameEn || churchNameAm);
 
@@ -264,63 +168,6 @@ export default function MoreScreen() {
           </SectionBoundary>
         )}
 
-        {/* Path B: Native APK Update Card (if update available) */}
-        {apkUpdate?.isUpdateAvailable && (
-          <SectionBoundary name="Explore.UpdateCard">
-            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.accent, marginTop: 12, borderWidth: 1 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <Cross size={14} color={c.accent} />
-                <ThemedText type="subtitle" colorType="accent" style={{ marginLeft: 8, fontWeight: '700' }}>
-                  {apkUpdate.isMandatory ? t(locale, 'updateRequired') : t(locale, 'updateAvailable')}
-                </ThemedText>
-              </View>
-
-              <ThemedText type="small" colorType="text" style={{ marginTop: 4 }}>
-                {t(locale, 'updateVersion')}: {apkUpdate.manifest.versionName} (v{apkUpdate.manifest.versionCode}) • {(apkUpdate.manifest.sizeBytes / (1024 * 1024)).toFixed(1)} MB
-              </ThemedText>
-
-              <ThemedText type="small" colorType="textFaint" style={{ marginTop: 6, fontStyle: 'italic' }}>
-                {isAm ? apkUpdate.manifest.notes_am : apkUpdate.manifest.notes_en}
-              </ThemedText>
-
-              {downloading ? (
-                <View style={{ marginTop: 12 }}>
-                  <ThemedText type="smallBold" colorType="accent">
-                    {t(locale, 'btnDownloading').replace('%1', downloadProgress.toString())}
-                  </ThemedText>
-                  <View style={{ height: 6, backgroundColor: c.border, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                    <View style={{ width: `${downloadProgress}%`, height: '100%', backgroundColor: c.accent }} />
-                  </View>
-                  <Pressable
-                    onPress={handleCancelDownload}
-                    style={{ marginTop: 10, alignSelf: 'flex-start' }}
-                  >
-                    <ThemedText type="smallBold" style={{ color: c.danger }}>
-                      {t(locale, 'btnCancelDownload')}
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              ) : (
-                <Pressable
-                  onPress={handleInstallClick}
-                  style={{
-                    backgroundColor: c.accent,
-                    paddingVertical: 10,
-                    paddingHorizontal: 16,
-                    borderRadius: 6,
-                    marginTop: 12,
-                    alignItems: 'center',
-                  }}
-                >
-                  <ThemedText type="smallBold" style={{ color: c.bg, fontWeight: '700' }}>
-                    {downloadedFileUri ? t(locale, 'btnInstallApk') : t(locale, 'btnDownloadUpdate')}
-                  </ThemedText>
-                </Pressable>
-              )}
-            </View>
-          </SectionBoundary>
-        )}
-
         {/* Section Header */}
         <View style={styles.sectionHeader}>
           <ThemedText type="smallBold" colorType="textFaint" style={styles.sectionTitle}>
@@ -346,24 +193,6 @@ export default function MoreScreen() {
             </Pressable>
           ))}
 
-          {/* Allow Mobile Data Downloads Toggle */}
-          <Pressable
-            onPress={handleToggleMobileData}
-            style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-          >
-            <ThemedText type="default" colorType="text" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "500" }}>
-              {t(locale, 'allowMobileDataUpdates')}
-            </ThemedText>
-            <View style={[styles.chip, {
-              borderColor: allowMobileData ? c.accentDim : c.border,
-              backgroundColor: allowMobileData ? c.accentGlow : "transparent"
-            }]}>
-              <ThemedText type="smallBold" style={{ color: allowMobileData ? c.accent : c.textFaint }}>
-                {allowMobileData ? "ON" : "OFF"}
-              </ThemedText>
-            </View>
-          </Pressable>
-
           {/* Night Reading Toggle */}
           <Pressable
             onPress={toggleTheme}
@@ -381,6 +210,15 @@ export default function MoreScreen() {
               </ThemedText>
             </View>
           </Pressable>
+
+          {/* Updates — installed version, a check button that ignores the
+              throttle, when it last really checked, and Wi-Fi-only. */}
+          <View style={styles.sectionHeader}>
+            <ThemedText type="smallBold" colorType="textFaint" style={styles.sectionTitle}>
+              {isAm ? "ማሻሻያዎች" : "Updates"}
+            </ThemedText>
+          </View>
+          <UpdateSection c={c} lang={locale} />
 
           {/* About / credits */}
           <Pressable
