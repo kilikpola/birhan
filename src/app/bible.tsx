@@ -47,7 +47,7 @@ interface Verse {
 
 export default function BibleScreen() {
   const db = useSQLiteContext();
-  const { c, lang } = useApp();
+  const { c, lang, readingLang, setReadingLang } = useApp();
   const isAm = lang === 'am';
 
   // Navigation state
@@ -61,9 +61,13 @@ export default function BibleScreen() {
   const [highlights, setHighlights] = useState<Record<number, string>>({}); // verse -> color
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
 
-  // View state
-  const [viewMode, setViewMode] = useState<"am" | "en" | "both">("am");
+  // View state. The reading language is a stored app preference, not local
+  // state — it is also settable from Settings, and it used to reset on every
+  // launch because it lived only here.
+  const viewMode = readingLang;
+  const setViewMode = setReadingLang;
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const [expandedBookId, setExpandedBookId] = useState<number | null>(null);
 
   // Search state
@@ -401,14 +405,45 @@ export default function BibleScreen() {
       {/* Top Header */}
       <SectionBoundary name="Bible.Nav">
         <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.bg }]}>
-          {/* The chapter title lives in the chapter card below, which is the
-              primary selector. Only search sits up here now. */}
+          {/* Where you are, kept as plain text rather than a card. Something has
+              to say which chapter is on screen, and this is the smallest thing
+              that can. Tapping it opens the same picker as the book button. */}
+          <TouchableOpacity
+            onPress={() => setSelectorOpen(true)}
+            style={styles.headerRef}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
+            <ThemedText type="smallBold" colorType="text" isAmharic={isAm} numberOfLines={1}>
+              {currentBook ? (isAm ? currentBook.name_am : currentBook.name_en) : ""}{" "}
+              {isAm ? toGeezNumeral(currentChapter) : currentChapter}
+            </ThemedText>
+          </TouchableOpacity>
+
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setSelectorOpen(true)}
+              style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={isAm ? "መጽሐፍ ይምረጡ" : "Select book"}
+            >
+              <Icon name="book" size={17} color={c.textSoft} />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setSearchOpen(true)}
               style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={isAm ? "ፈልግ" : "Search"}
             >
               <Icon name="search" size={17} color={c.textSoft} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setLangOpen(true)}
+              style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={isAm ? "ቋንቋ" : "Language"}
+            >
+              <Icon name="globe" size={17} color={c.textSoft} />
             </TouchableOpacity>
           </View>
         </View>
@@ -416,71 +451,6 @@ export default function BibleScreen() {
 
       {/* Reader Layout Scroll */}
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.versesContainer}>
-        {/* View mode segment switcher */}
-        <View style={[styles.seg, { backgroundColor: c.surface, borderColor: c.border }]}>
-          {[
-            { k: "am", l: "አማርኛ", isAm: true },
-            { k: "en", l: "English", isAm: false },
-            { k: "both", l: "ሁለቱም", isAm: true },
-          ].map((o) => (
-            <TouchableOpacity
-              key={o.k}
-              onPress={() => setViewMode(o.k as any)}
-              style={[
-                styles.segBtn,
-                viewMode === o.k && { backgroundColor: c.accent },
-              ]}
-            >
-              <ThemedText
-                type="smallBold"
-                isAmharic={o.isAm}
-                style={{
-                  color: viewMode === o.k ? c.bg : c.textSoft,
-                }}
-              >
-                {o.l}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Chapter Title & Navigation Row */}
-        <View style={[styles.chapterRow, { backgroundColor: c.surface, borderColor: c.border }]}>
-          {/* Opening the book picker moved here with the title. This card is
-              now the only chapter header, so it has to carry the job the
-              removed top bar used to do — otherwise the picker is unreachable
-              and you can only step one chapter at a time through 66 books. */}
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={0.7}
-            onPress={() => setSelectorOpen(true)}
-            accessibilityRole="button"
-          >
-            <ThemedText type="subtitle" colorType="text" isAmharic={true}>
-              {currentBook ? (isAm ? currentBook.name_am : currentBook.name_en) : ""} {toGeezNumeral(currentChapter)}
-            </ThemedText>
-            <ThemedText type="small" colorType="textFaint" style={{ marginTop: 2 }}>
-              {currentBook?.name_en} {currentChapter} · {currentBook?.testament === 'OT' ? 'ብሉይ ኪዳን' : 'አዲስ ኪዳን'}
-            </ThemedText>
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <TouchableOpacity
-              onPress={prevChapter}
-              style={[styles.navIconBtn, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}
-            >
-              <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <Icon name="chev" size={14} color={c.textSoft} />
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={nextChapter}
-              style={[styles.navIconBtn, { borderColor: c.border, backgroundColor: c.surfaceAlt }]}
-            >
-              <Icon name="chev" size={14} color={c.textSoft} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Verse Cards Container */}
         <SectionBoundary name="Bible.ChapterContent" skeleton={<BibleSkeleton />}>
           {showBibleSkeleton ? (
@@ -585,6 +555,44 @@ export default function BibleScreen() {
           </View>
         </SectionBoundary>
       </ScrollView>
+
+      {/* Language. The same three choices the segmented control offered, moved
+          behind the globe icon so the names are not permanently on screen. */}
+      <Modal visible={langOpen} animationType="fade" transparent onRequestClose={() => setLangOpen(false)}>
+        <TouchableOpacity style={styles.langBackdrop} activeOpacity={1} onPress={() => setLangOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={[styles.langSheet, { backgroundColor: c.surface, borderColor: c.borderLit }]}>
+              <ThemedText type="smallBold" colorType="textFaint" style={styles.langHeading}>
+                {isAm ? "ቋንቋ" : "Language"}
+              </ThemedText>
+              {[
+                { k: "am", l: "አማርኛ", amharic: true },
+                { k: "en", l: "English", amharic: false },
+                { k: "both", l: isAm ? "ሁለቱም" : "Both", amharic: isAm },
+              ].map((o) => (
+                <TouchableOpacity
+                  key={o.k}
+                  onPress={() => {
+                    setViewMode(o.k as any);
+                    setLangOpen(false);
+                  }}
+                  style={[styles.langRow, { borderColor: c.border }]}
+                  accessibilityRole="button"
+                >
+                  <ThemedText
+                    type="default"
+                    isAmharic={o.amharic}
+                    style={{ color: viewMode === o.k ? c.accent : c.text, flex: 1 }}
+                  >
+                    {o.l}
+                  </ThemedText>
+                  {viewMode === o.k ? <Icon name="check" size={16} color={c.accent} /> : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Book & Chapter Selector Modal */}
       <Modal visible={selectorOpen} animationType="slide" transparent={false}>
@@ -794,15 +802,29 @@ const styles = StyleSheet.create({
   outer: { flex: 1 },
   header: {
     flexDirection: "row",
-    // Search is the only control left up here.
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerRef: { flex: 1, marginRight: 12 },
+  langBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  langSheet: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 18, paddingVertical: 10 },
+  langHeading: { paddingVertical: 10 },
+  langRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   iconbtn: {
     width: 36,
     height: 36,
@@ -811,28 +833,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-  },
-  seg: {
-    flexDirection: 'row',
-    borderRadius: radius.md,
-    padding: 3,
-    gap: 3,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  segBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    alignItems: 'center',
-    borderRadius: radius.sm,
-  },
-  chapterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 14,
   },
   navIconBtn: {
     width: 34,

@@ -37,7 +37,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>{t(lang, "more")}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{t(lang, "settingsTitle")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/more.png')}
           renderingMode="template"

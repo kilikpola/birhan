@@ -1,36 +1,64 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, ScrollView, TouchableOpacity, Pressable, Alert, ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { router, type Href } from "expo-router";
-import { useApp } from "@/theme/context";
-import { t } from "@/i18n";
-import { ThemedText } from "@/components/themed-text";
-import { Cross } from "@/components/cross";
-import { Icon } from "@/components/icon";
-import { DeleteAccountModal, DeleteAccountRow } from '../components/settings/delete-account';
-import { Logo } from "@/components/logo";
-import { VerificationStatus } from "@/components/verification-status";
-import { useAuth } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";
-import { radius, space, fonts } from "@/theme/tokens";
-import { SectionBoundary } from "@/components/section-boundary";
-import { reportError } from "@/lib/errors";
-import Constants from "expo-constants";
-import { UpdateSection } from "@/components/settings/update-section";
-import { initOtaUpdateListener } from "@/lib/otaUpdates";
+import { useState } from 'react';
+import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, type Href } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useApp } from '@/theme/context';
+import { t } from '@/i18n';
+import { ThemedText } from '@/components/themed-text';
+import { Cross } from '@/components/cross';
+import { Icon } from '@/components/icon';
+import { Logo } from '@/components/logo';
+import { VerificationStatus } from '@/components/verification-status';
+import { SectionBoundary } from '@/components/section-boundary';
+import { useAuth } from '@/lib/auth';
+import { reportError } from '@/lib/errors';
+import { radius, space } from '@/theme/tokens';
 
-export default function MoreScreen() {
-  const { c, night: isNight, setNight, lang: locale, setLang: setLocale } = useApp();
+import { Section, Row, SubLabel, ChoiceRows } from '@/components/settings/rows';
+import { AccountSection } from '@/components/settings/account-section';
+import { DataSection } from '@/components/settings/data-section';
+import { UpdateSection } from '@/components/settings/update-section';
+import { DeleteAccountModal } from '@/components/settings/delete-account';
+import { getCurrentVersionName, getCurrentVersionCode } from '@/lib/apkUpdates';
+import type { ThemeMode, ReadingLang } from '@/theme/context';
+import type { Lang } from '@/i18n';
+
+const PRIVACY_URL = 'https://birhan.online/#privacy';
+const CONTACT_EMAIL = 'mailto:hello@birhan.online';
+
+/**
+ * Settings.
+ *
+ * This screen used to be a single undifferentiated column: profile card,
+ * then a dozen rows mixing "your church" with "night reading" with "allow
+ * mobile data", then sign out. Nothing indicated which rows belonged
+ * together, so finding anything meant reading all of it.
+ *
+ * It is now five groups, in the order someone is likely to want them —
+ * who you are, how it looks, what it is using, whether it is current, and
+ * what it is made of.
+ */
+export default function SettingsScreen() {
+  const {
+    c,
+    lang,
+    setLang,
+    themeMode,
+    setThemeMode,
+    readingLang,
+    setReadingLang,
+  } = useApp();
   const { profile, signOut, isSuperAdmin, resendVerificationEmail, syncVerification } = useAuth();
-  const [showDelete, setShowDelete] = useState(false);
 
-  const isAm = locale === "am";
+  const [showDelete, setShowDelete] = useState(false);
+  const isAm = lang === 'am';
 
   // Standing reminder for anyone who dismissed the post-signup verification
-  // screen (or restarted the app) before confirming — that screen only shows
-  // once, so this is the only other way back to "resend".
+  // screen before confirming — that screen only shows once, so this is the
+  // only other way back to "resend".
   const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const handleResendVerification = async () => {
+  const handleResend = async () => {
     setResendState('sending');
     const res = await resendVerificationEmail();
     if (res.status === 'sent') {
@@ -40,250 +68,154 @@ export default function MoreScreen() {
       syncVerification().catch(() => {});
     } else {
       setResendState('error');
-      reportError(new Error(res.message), 'Explore.resendVerification', locale, false);
+      reportError(new Error(res.message), 'Settings.resendVerification', lang, false);
     }
   };
-  const toggleTheme = () => setNight(!isNight);
 
-  // Seeded churches offline fallback lookup map
-  const SEEDED_MAP: Record<string, { am: string; en: string }> = {
-    'a0000000-0000-4000-8000-000000000001': { am: 'የኢትዮጵያ ወንጌላዊት ቤተ ክርስቲያን መካነ ኢየሱስ', en: 'Ethiopian Evangelical Church Mekane Yesus' },
-    'a0000000-0000-4000-8000-000000000002': { am: 'የኢትዮጵያ ቃለ ሕይወት ቤተ ክርስቲያን', en: 'Ethiopian Kale Heywet Church' },
-    'a0000000-0000-4000-8000-000000000003': { am: 'የኢትዮጵያ ሙሉ ወንጌል አማኞች ቤተ ክርስቲያን', en: "Ethiopian Full Gospel Believers' Church" },
-    'a0000000-0000-4000-8000-000000000004': { am: 'መሠረተ ክርስቶስ ቤተ ክርስቲያን', en: 'Meserete Kristos Church' },
-    'a0000000-0000-4000-8000-000000000005': { am: 'አማኑኤል ኅብረት ቤተ ክርስቲያን', en: 'Emmanuel United Church' },
-    'a0000000-0000-4000-8000-000000000006': { am: 'ሕይወት ብርሃን ቤተ ክርስቲያን', en: 'Hiwot Berhan Church' },
-    'a0000000-0000-4000-8000-000000000007': { am: 'የኢትዮጵያ ባፕቲስት አብያተ ክርስቲያናት', en: 'Ethiopian Baptist Churches' },
-  };
+  const themeOptions: { value: ThemeMode; label: string; amharic?: boolean }[] = [
+    { value: 'dark', label: t(lang, 'themeDark'), amharic: isAm },
+    { value: 'light', label: t(lang, 'themeLight'), amharic: isAm },
+    { value: 'system', label: t(lang, 'themeSystem'), amharic: isAm },
+  ];
 
-  // Church Name States
-  const [churchNameAm, setChurchNameAm] = useState("");
-  const [churchNameEn, setChurchNameEn] = useState("");
+  const uiLangOptions: { value: Lang; label: string; amharic?: boolean }[] = [
+    { value: 'am', label: 'አማርኛ', amharic: true },
+    { value: 'en', label: 'English' },
+  ];
 
-  useEffect(() => {
-    if (!profile?.church_id) {
-      setChurchNameAm("");
-      setChurchNameEn("");
-      return;
-    }
-
-    // Clear and set initial cached/seeded values
-    const seededChurch = SEEDED_MAP[profile.church_id];
-    setChurchNameAm(profile.church_name_am || seededChurch?.am || "");
-    setChurchNameEn(profile.church_name_en || seededChurch?.en || "");
-
-    let active = true;
-    // No single-church-by-id route exists — only list-all (GET /churches) and
-    // branches-by-church. Fetching the full list is what's available; it's
-    // public and small, but this re-downloads every church for one lookup.
-    apiFetch<{ churches: any[] }>("/api/v1/churches", { auth: false })
-      .then((res) => {
-        if (!active) return;
-        const data = res.churches.find((ch) => ch.id === profile.church_id);
-        if (data) {
-          setChurchNameAm(data.nameAm);
-          setChurchNameEn(data.nameEn);
-        }
-      })
-      .catch((err) => reportError(err, "Explore.loadChurch", "am", false));
-    return () => { active = false; };
-  }, [profile?.church_id, profile?.church_name_am, profile?.church_name_en]);
-
-  const displayRole = () => {
-    if (profile?.role === "super_admin") return isAm ? "ሱፐር አስተዳዳሪ" : "Super Admin";
-    if (profile?.role === "pastor") return isAm ? "እረኛ (Pastor)" : "Pastor";
-    if (profile?.role === "admin") return isAm ? "አስተዳዳሪ (Admin)" : "Admin";
-    if (profile?.role === "pending_pastor") return isAm ? "በመጠባበቅ ላይ" : "Pending pastor";
-    return isAm ? "አባል" : "Member";
-  };
-
-  useEffect(() => {
-    // OTA (JS-only) patches, in the background. Fire-and-forget: nothing here
-    // is awaited, so an unreachable update server cannot delay the screen.
-    initOtaUpdateListener();
-  }, []);
-
-  const currentChurchDisplay = isAm ? (churchNameAm || churchNameEn) : (churchNameEn || churchNameAm);
-
-  const appVersion = Constants.expoConfig?.version ? `v${Constants.expoConfig.version}` : 'v1.0.0';
-
-  const settingsItems = [
-    { l: isAm ? "ሙሉ ስም" : "Display Name", v: profile?.display_name || '—' },
-    { l: isAm ? "ቤተ ክርስቲያኔ" : "My Church", v: (profile?.church_id ? currentChurchDisplay : '') || '—' },
-    { l: isAm ? "ቅርንጫፍ" : "Branch", v: profile?.branch_name || '—' },
-    { l: isAm ? "ድርሻ" : "Role", v: displayRole() },
-    { l: isAm ? "የወረደ ዳታ" : "Offline Scripture Data", v: isAm ? "ተጭኗል (0 MB)" : "Bundled (0 MB)" },
-    { l: isAm ? "ቋንቋ" : "Language", v: isAm ? "አማርኛ" : "English", action: () => setLocale(isAm ? "en" : "am") },
-    { l: isAm ? "ስለ ብርሃን" : "About Birhan", v: appVersion },
+  const readingOptions: { value: ReadingLang; label: string; amharic?: boolean }[] = [
+    { value: 'am', label: 'አማርኛ', amharic: true },
+    { value: 'en', label: 'English' },
+    { value: 'both', label: t(lang, 'readingBoth'), amharic: isAm },
   ];
 
   return (
     <SafeAreaView style={[styles.outer, { backgroundColor: c.bg }]} edges={['top', 'left', 'right']}>
-      {/* Header */}
       <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.bg }]}>
         <ThemedText type="title" colorType="text" isAmharic={isAm}>
-          {t(locale, "more")}
+          {t(lang, 'settingsTitle')}
         </ThemedText>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Card */}
-        <SectionBoundary name="Explore.Profile">
-          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.borderLit, flexDirection: "row", alignItems: "center", gap: 14 }]}>
-            <View style={[styles.userAvatar, { backgroundColor: c.accentGlow, borderColor: c.accentDim }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Who is signed in — kept above the groups because it answers
+            "whose settings are these" before anything else. */}
+        <SectionBoundary name="Settings.Profile">
+          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.borderLit }]}>
+            <View style={[styles.avatar, { backgroundColor: c.accentGlow, borderColor: c.accentDim }]}>
               <Icon name="user" size={22} color={c.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="subtitle" colorType="text" style={{ fontSize: 16, fontWeight: "600" }}>
-                {profile?.display_name || (isAm ? "አባል" : "Member")}
+              <ThemedText type="subtitle" colorType="text" style={styles.name}>
+                {profile?.display_name || (isAm ? 'አባል' : 'Member')}
               </ThemedText>
               <ThemedText type="small" colorType="textFaint" style={{ marginTop: 2 }}>
-                {profile?.church_id
-                  ? (currentChurchDisplay ? currentChurchDisplay + (profile.branch_name ? ` - ${profile.branch_name}` : "") : (isAm ? "ቤተ ክርስቲያን" : "Church"))
-                  : (isAm ? "ቤተ ክርስቲያን አልተመረጠም" : "No church selected")}
+                {profile?.email || profile?.phone || ''}
               </ThemedText>
             </View>
             <View style={[styles.chip, { borderColor: c.accentDim, backgroundColor: c.accentGlow }]}>
               <Cross size={8} color={c.accent} />
-              <ThemedText type="smallBold" colorType="accent" style={{ fontSize: 9.5, marginLeft: 4 }}>
-                {displayRole()}
+              <ThemedText type="smallBold" colorType="accent" style={styles.chipTxt}>
+                {profile?.role === 'super_admin'
+                  ? (isAm ? 'ሱፐር' : 'Super')
+                  : profile?.role === 'pastor'
+                    ? (isAm ? 'እረኛ' : 'Pastor')
+                    : (isAm ? 'አባል' : 'Member')}
               </ThemedText>
             </View>
           </View>
         </SectionBoundary>
 
-        {/* Standing email-verification reminder — see resendState above */}
         {!!profile?.email && !profile.email_verified && (
-          <SectionBoundary name="Explore.VerificationReminder">
-            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 12 }]}>
+          <SectionBoundary name="Settings.VerificationReminder">
+            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: space.md }]}>
               <VerificationStatus
                 c={c}
                 state={resendState === 'sending' ? 'sending' : resendState === 'sent' ? 'sent' : 'unverified'}
-                title={t(locale, 'notVerifiedStatus')}
-                note={resendState === 'sent' ? t(locale, 'resendSentConfirm') : profile.email}
-                actionLabel={resendState === 'sending' ? undefined : t(locale, 'btnResendEmail')}
-                onAction={resendState === 'sending' ? undefined : handleResendVerification}
+                title={t(lang, 'notVerifiedStatus')}
+                note={resendState === 'sent' ? t(lang, 'resendSentConfirm') : profile.email}
+                actionLabel={resendState === 'sending' ? undefined : t(lang, 'btnResendEmail')}
+                onAction={resendState === 'sending' ? undefined : handleResend}
               />
             </View>
           </SectionBoundary>
         )}
 
-        {/* Section Header */}
-        <View style={styles.sectionHeader}>
-          <ThemedText type="smallBold" colorType="textFaint" style={styles.sectionTitle}>
-            {isAm ? "ቅንብሮች" : "Settings"}
-          </ThemedText>
-        </View>
-
-        {/* Settings Rows & Theme Toggle */}
-        <SectionBoundary name="Explore.Settings">
-          {settingsItems.map((i) => (
-            <Pressable
-              key={i.l}
-              onPress={i.action}
-              style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-            >
-              <ThemedText type="default" colorType="text" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "500" }}>
-                {i.l}
-              </ThemedText>
-              <ThemedText type="small" colorType="textFaint" style={{ marginRight: 6 }}>
-                {i.v}
-              </ThemedText>
-              <Icon name="chev" size={15} color={c.textFaint} />
-            </Pressable>
-          ))}
-
-          {/* Night Reading Toggle */}
-          <Pressable
-            onPress={toggleTheme}
-            style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-          >
-            <ThemedText type="default" colorType="text" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "500" }}>
-              {isAm ? "የሌሊት ንባብ" : "Night reading"}
-            </ThemedText>
-            <View style={[styles.chip, {
-              borderColor: isNight ? c.accentDim : c.border,
-              backgroundColor: isNight ? c.accentGlow : "transparent"
-            }]}>
-              <ThemedText type="smallBold" style={{ color: isNight ? c.accent : c.textFaint }}>
-                {isNight ? "ON" : "OFF"}
-              </ThemedText>
-            </View>
-          </Pressable>
-
-          {/* Updates — installed version, a check button that ignores the
-              throttle, when it last really checked, and Wi-Fi-only. */}
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold" colorType="textFaint" style={styles.sectionTitle}>
-              {isAm ? "ማሻሻያዎች" : "Updates"}
-            </ThemedText>
-          </View>
-          <UpdateSection c={c} lang={locale} />
-
-          {/* About / credits */}
-          <Pressable
-            onPress={() => router.push('/about' as Href)}
-            style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-          >
-            <ThemedText type="default" colorType="text" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "500" }}>
-              {t(locale, 'about')}
-            </ThemedText>
-            <Icon name="chev" size={15} color={c.textFaint} />
-          </Pressable>
-        </SectionBoundary>
-
-        {/* Super-admin: pastor verification queue (Stage 3) */}
+        {/* Super-admins get their queue near the top; it is work, not a setting. */}
         {isSuperAdmin && (
-          <SectionBoundary name="Explore.Verification">
+          <SectionBoundary name="Settings.Verification">
             <Pressable
               onPress={() => router.push('/verification' as Href)}
-              style={[styles.row, { backgroundColor: c.surface, borderColor: c.accentDim, marginTop: 8 }]}
+              style={[styles.adminRow, { backgroundColor: c.surface, borderColor: c.accentDim }]}
+              accessibilityRole="button"
             >
-              <ThemedText type="default" colorType="accent" isAmharic={isAm} style={{ flex: 1, fontSize: 14.5, fontWeight: "600" }}>
-                {t(locale, "verificationQueue")}
+              <ThemedText type="default" colorType="accent" isAmharic={isAm} style={styles.adminTxt}>
+                {t(lang, 'verificationQueue')}
               </ThemedText>
               <Icon name="chev" size={15} color={c.accent} />
             </Pressable>
           </SectionBoundary>
         )}
 
-        {/* Inspirational Verse / Blessing Card */}
-        <SectionBoundary name="Explore.Blessing" fallback={null}>
-          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, marginTop: 24, alignItems: "center", padding: 24 }]}>
-            <Cross size={22} color={c.accent} />
-            <ThemedText type="verse" colorType="text" isAmharic={true} style={{ fontSize: 15, marginTop: 12, lineHeight: 28, textAlign: "center" }}>
-              ሁልጊዜ በጌታ ደስ ይበላችሁ
-            </ThemedText>
-            <ThemedText type="small" colorType="textFaint" style={{ marginTop: 6, textAlign: "center" }}>
-              Rejoice in the Lord always — Philippians 4:4
-            </ThemedText>
-          </View>
+        <SectionBoundary name="Settings.Account">
+          <Section c={c} lang={lang} title={t(lang, 'accountSectionTitle')}>
+            <AccountSection
+              c={c}
+              lang={lang}
+              profile={profile}
+              onSignOut={signOut}
+              onDelete={() => setShowDelete(true)}
+            />
+          </Section>
         </SectionBoundary>
 
-        {/* Delete Account — sits with the other account-level actions rather
-            than among the display preferences above. */}
-        <SectionBoundary name="Explore.DeleteAccount" fallback={null}>
-          <DeleteAccountRow c={c} lang={locale} onPress={() => setShowDelete(true)} />
+        <SectionBoundary name="Settings.Appearance">
+          <Section c={c} lang={lang} title={t(lang, 'sectionAppearance')}>
+            <SubLabel c={c} lang={lang} text={t(lang, 'themeLabel')} />
+            <ChoiceRows c={c} lang={lang} selected={themeMode} options={themeOptions} onSelect={setThemeMode} />
+
+            <SubLabel c={c} lang={lang} text={t(lang, 'interfaceLanguageLabel')} />
+            <ChoiceRows c={c} lang={lang} selected={lang} options={uiLangOptions} onSelect={setLang} />
+
+            <SubLabel c={c} lang={lang} text={t(lang, 'readingLanguageLabel')} />
+            <ChoiceRows c={c} lang={lang} selected={readingLang} options={readingOptions} onSelect={setReadingLang} />
+          </Section>
         </SectionBoundary>
 
-        {/* Sign Out Button */}
-        <SectionBoundary name="Explore.SignOut" fallback={null}>
-          <TouchableOpacity
-            onPress={signOut}
-            style={[styles.signOutBtn, { backgroundColor: c.surface, borderColor: c.border }]}
-          >
-            <Icon name="gear" size={16} color={c.textFaint} />
-            <ThemedText type="default" colorType="textFaint" style={{ marginLeft: 8, fontWeight: '600' }}>
-              {isAm ? "ውጣ (Sign Out)" : "Sign Out"}
-            </ThemedText>
-          </TouchableOpacity>
+        <SectionBoundary name="Settings.Data">
+          <Section c={c} lang={lang} title={t(lang, 'sectionDataDownloads')}>
+            <DataSection c={c} lang={lang} />
+          </Section>
         </SectionBoundary>
 
-        {/* Brand Footer */}
-        <View style={styles.brandFoot}>
-          <Logo size={64} />
-          <ThemedText type="small" colorType="textFaint" style={{ marginTop: 8 }}>
-            Birhan · v0.4
+        <SectionBoundary name="Settings.Updates">
+          <Section c={c} lang={lang} title={t(lang, 'sectionUpdates')}>
+            <UpdateSection c={c} lang={lang} />
+          </Section>
+        </SectionBoundary>
+
+        <SectionBoundary name="Settings.About">
+          <Section c={c} lang={lang} title={t(lang, 'sectionAbout')}>
+            <Row c={c} lang={lang} label={t(lang, 'about')} onPress={() => router.push('/about' as Href)} />
+            <Row
+              c={c}
+              lang={lang}
+              label={t(lang, 'privacyLabel')}
+              onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL).catch(() => {})}
+            />
+            <Row
+              c={c}
+              lang={lang}
+              label={t(lang, 'contactLabel')}
+              onPress={() => WebBrowser.openBrowserAsync(CONTACT_EMAIL).catch(() => {})}
+            />
+          </Section>
+        </SectionBoundary>
+
+        <View style={styles.foot}>
+          <Logo size={56} />
+          <ThemedText type="small" colorType="textFaint" style={{ marginTop: space.sm }}>
+            Birhan · v{getCurrentVersionName()} ({getCurrentVersionCode()})
           </ThemedText>
         </View>
       </ScrollView>
@@ -291,10 +223,8 @@ export default function MoreScreen() {
       <DeleteAccountModal
         visible={showDelete}
         c={c}
-        lang={locale}
+        lang={lang}
         onClose={() => setShowDelete(false)}
-        // The token has already been revoked server-side by this point; this
-        // clears the one on disk so the app returns to the login screen.
         onDeleted={() => {
           setShowDelete(false);
           signOut();
@@ -307,67 +237,47 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   outer: { flex: 1 },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
     borderBottomWidth: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 60,
-  },
+  scroll: { paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: 64 },
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     borderRadius: radius.lg,
     borderWidth: 1,
-    padding: 16,
-    marginTop: 4,
+    padding: space.lg,
   },
-  userAvatar: {
+  avatar: {
     width: 52,
     height: 52,
     borderRadius: radius.md,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  name: { fontSize: 16, fontWeight: '600' },
   chip: {
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: radius.pill,
     borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionHeader: {
-    marginTop: 22,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 8,
-  },
-  signOutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: 14,
-    marginTop: 24,
   },
-  brandFoot: {
+  chipTxt: { fontSize: 9.5, marginLeft: 4 },
+  adminRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 28,
+    gap: space.sm,
+    minHeight: 52,
+    paddingHorizontal: space.md,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    marginTop: space.md,
   },
+  adminTxt: { flex: 1, fontSize: 14.5, fontWeight: '600' },
+  foot: { alignItems: 'center', marginTop: space.xxl },
 });

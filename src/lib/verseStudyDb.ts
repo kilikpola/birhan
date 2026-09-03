@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
+import { toFileUri } from './storage';
 
 /**
  * Read-only data access for the three verse-study databases bundled with the
@@ -86,8 +87,18 @@ export function formatMB(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
+/**
+ * Where the downloaded database lives, as a `file://` URI.
+ *
+ * Every caller of this is an expo-file-system call, and that API addresses
+ * files by URI. `SQLite.defaultDatabaseDirectory` is a bare path (on Android,
+ * `context.filesDir + "/SQLite"`), so handing it over unconverted made
+ * getInfoAsync report the file as absent — which surfaced as "not downloaded"
+ * however many times it had been. SQLite itself opens by filename, not by this
+ * path, so it is unaffected either way.
+ */
 function patristicDbPath(): string {
-  return joinPath(SQLite.defaultDatabaseDirectory, PATRISTIC_DB_FILENAME);
+  return toFileUri(joinPath(SQLite.defaultDatabaseDirectory, PATRISTIC_DB_FILENAME));
 }
 
 export async function isPatristicDbDownloaded(): Promise<boolean> {
@@ -114,7 +125,7 @@ let activePatristicDownload: FileSystem.DownloadResumable | null = null;
 export async function downloadPatristicDb(
   onProgress?: (percent: number) => void,
 ): Promise<void> {
-  const dir = SQLite.defaultDatabaseDirectory;
+  const dir = toFileUri(SQLite.defaultDatabaseDirectory);
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
   const dest = patristicDbPath();
 

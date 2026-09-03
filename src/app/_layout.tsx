@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
@@ -13,7 +13,7 @@ import {
 } from '@expo-google-fonts/noto-serif-ethiopic';
 
 import { light, dark, type Palette } from '../theme/tokens';
-import { Ctx, useApp } from '../theme/context';
+import { Ctx, useApp, type ThemeMode, type ReadingLang } from '../theme/context';
 import { t, type Lang } from '../i18n';
 import AppTabs from '../components/app-tabs';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -126,16 +126,22 @@ function Gate({ children }: { children: React.ReactNode }) {
 
 const PREF_NIGHT = 'birhan:night';
 const PREF_LANG = 'birhan:lang';
+const PREF_THEME_MODE = 'birhan:theme_mode';
+const PREF_READING_LANG = 'birhan:reading_lang';
 
 /** Fonts are bundled, so they load in milliseconds — but never hold the app
  *  hostage to them. After this long, fall back to system fonts and continue. */
 const FONT_TIMEOUT_MS = 5000;
 
 function RootLayout() {
-  const [night, setNightState] = useState(true);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('dark');
   const [lang, setLangState] = useState<Lang>('am');
+  const [readingLang, setReadingLangState] = useState<ReadingLang>('am');
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [fontTimeout, setFontTimeout] = useState(false);
+
+  // Only consulted when themeMode is 'system'.
+  const systemScheme = useColorScheme();
 
   // Register expo-router's navigation container so Sentry can name routes and
   // measure screen transitions. Harmless when monitoring is disabled.
@@ -159,12 +165,21 @@ function RootLayout() {
   useEffect(() => {
     (async () => {
       try {
-        const [n, l] = await Promise.all([
+        const [n, l, tm, rl] = await Promise.all([
           AsyncStorage.getItem(PREF_NIGHT),
           AsyncStorage.getItem(PREF_LANG),
+          AsyncStorage.getItem(PREF_THEME_MODE),
+          AsyncStorage.getItem(PREF_READING_LANG),
         ]);
-        if (n !== null) setNightState(n === '1');
+        // PREF_THEME_MODE is the newer key. Fall back to the boolean that
+        // shipped before it so an existing install keeps the theme it had.
+        if (tm === 'dark' || tm === 'light' || tm === 'system') {
+          setThemeModeState(tm);
+        } else if (n !== null) {
+          setThemeModeState(n === '1' ? 'dark' : 'light');
+        }
         if (l === 'am' || l === 'en') setLangState(l);
+        if (rl === 'am' || rl === 'en' || rl === 'both') setReadingLangState(rl);
       } catch {
         // Non-fatal — fall back to defaults.
       } finally {
@@ -173,17 +188,30 @@ function RootLayout() {
     })();
   }, []);
 
-  const setNight = useCallback((v: boolean) => {
-    setNightState(v);
-    AsyncStorage.setItem(PREF_NIGHT, v ? '1' : '0').catch(() => {});
+  const setThemeMode = useCallback((v: ThemeMode) => {
+    setThemeModeState(v);
+    AsyncStorage.setItem(PREF_THEME_MODE, v).catch(() => {});
   }, []);
+
+  // The quick sun/moon toggle. Tapping it is an explicit choice, so it settles
+  // on dark or light rather than leaving the theme following the phone.
+  const setNight = useCallback(
+    (v: boolean) => setThemeMode(v ? 'dark' : 'light'),
+    [setThemeMode],
+  );
 
   const setLang = useCallback((v: Lang) => {
     setLangState(v);
     AsyncStorage.setItem(PREF_LANG, v).catch(() => {});
   }, []);
 
+  const setReadingLang = useCallback((v: ReadingLang) => {
+    setReadingLangState(v);
+    AsyncStorage.setItem(PREF_READING_LANG, v).catch(() => {});
+  }, []);
+
   const fontsSettled = loaded || !!error || fontTimeout;
+  const night = themeMode === 'system' ? systemScheme !== 'light' : themeMode === 'dark';
   const c = night ? dark : light;
 
   // Hand off from the native splash only once this tree paints something of
@@ -198,7 +226,19 @@ function RootLayout() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Ctx.Provider value={{ c, night, setNight, lang, setLang }}>
+        <Ctx.Provider
+          value={{
+            c,
+            night,
+            setNight,
+            themeMode,
+            setThemeMode,
+            lang,
+            setLang,
+            readingLang,
+            setReadingLang,
+          }}
+        >
           <ToastProvider>
             <Gate>
               <AppTabs />
