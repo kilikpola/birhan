@@ -38,7 +38,7 @@
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",
-          "organization": "birhan",
+          "organization": "ghost-team-21",
           "project": "birhan-mobile"
         }
       ],
