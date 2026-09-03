@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { space } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { t, type Lang } from '@/i18n';
-import { Row } from './rows';
+import { Card, Row } from './rows';
 import { apiFetch } from '@/lib/api';
 import { reportError } from '@/lib/errors';
 import { LAY_ROLES, CLERGY_ROLE_QES, CLERGY_ROLES_STANDARD } from '@/constants/roles';
@@ -109,29 +109,35 @@ export function AccountSection({
   }
 
   return (
-    <View style={{ gap: space.sm }}>
-      <Row c={c} lang={lang} label={isAm ? 'ሙሉ ስም' : 'Name'} value={profile?.display_name || '—'} />
-      <Row c={c} lang={lang} label={t(lang, 'churchLabel')} value={church} />
-      <Row c={c} lang={lang} label={t(lang, 'branchLabel')} value={profile?.branch_name || '—'} />
-      {role ? <Row c={c} lang={lang} label={t(lang, 'roleLabel')} value={role} /> : null}
-      <Row
-        c={c}
-        lang={lang}
-        label={isAm ? 'በብርሃን ውስጥ ያለዎት ደረጃ' : 'Account type'}
-        value={accountRoleLabel(profile?.role, lang)}
-      />
+    <View>
+      {/* Who you are — read-only facts, one card. */}
+      <Card c={c}>
+        <Row c={c} lang={lang} label={isAm ? 'ሙሉ ስም' : 'Name'} value={profile?.display_name || '—'} />
+        <Row c={c} lang={lang} label={t(lang, 'churchLabel')} value={church} />
+        <Row c={c} lang={lang} label={t(lang, 'branchLabel')} value={profile?.branch_name || '—'} />
+        {role ? <Row c={c} lang={lang} label={t(lang, 'roleLabel')} value={role} /> : null}
+        <Row
+          c={c}
+          lang={lang}
+          label={isAm ? 'በብርሃን ውስጥ ያለዎት ደረጃ' : 'Account type'}
+          value={accountRoleLabel(profile?.role, lang)}
+        />
+        {contactRows.map((r) => (
+          <Row key={r.label} c={c} lang={lang} label={r.label} note={r.note} value={r.value} />
+        ))}
+      </Card>
 
-      {contactRows.map((r) => (
-        <Row key={r.label} c={c} lang={lang} label={r.label} note={r.note} value={r.value} />
-      ))}
-
+      {/* Actions, kept apart from the facts above so a destructive one is never
+          a neighbour of a label you were only reading. */}
       <View style={styles.gap} />
-      <Row c={c} lang={lang} label={t(lang, 'signOut')} onPress={onSignOut} />
-      <Row c={c} lang={lang} label={t(lang, 'deleteAccount')} onPress={onDelete} danger />
+      <Card c={c}>
+        <Row c={c} lang={lang} label={t(lang, 'signOut')} onPress={onSignOut} />
+        <Row c={c} lang={lang} label={t(lang, 'deleteAccount')} onPress={onDelete} danger />
+      </Card>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gap: { height: space.xs },
+  gap: { height: space.md },
 });

@@ -15,7 +15,7 @@ import { useAuth } from '@/lib/auth';
 import { reportError } from '@/lib/errors';
 import { radius, space } from '@/theme/tokens';
 
-import { Section, Row, SubLabel, ChoiceRows } from '@/components/settings/rows';
+import { Section, Card, Row, SubLabel, ChoiceRows } from '@/components/settings/rows';
 import { AccountSection } from '@/components/settings/account-section';
 import { DataSection } from '@/components/settings/data-section';
 import { UpdateSection } from '@/components/settings/update-section';
@@ -171,14 +171,20 @@ export default function SettingsScreen() {
 
         <SectionBoundary name="Settings.Appearance">
           <Section c={c} lang={lang} title={t(lang, 'sectionAppearance')}>
-            <SubLabel c={c} lang={lang} text={t(lang, 'themeLabel')} />
-            <ChoiceRows c={c} lang={lang} selected={themeMode} options={themeOptions} onSelect={setThemeMode} />
-
-            <SubLabel c={c} lang={lang} text={t(lang, 'interfaceLanguageLabel')} />
-            <ChoiceRows c={c} lang={lang} selected={lang} options={uiLangOptions} onSelect={setLang} />
-
-            <SubLabel c={c} lang={lang} text={t(lang, 'readingLanguageLabel')} />
-            <ChoiceRows c={c} lang={lang} selected={readingLang} options={readingOptions} onSelect={setReadingLang} />
+            <Card c={c}>
+              <SubLabel c={c} lang={lang} text={t(lang, 'themeLabel')} />
+              <ChoiceRows c={c} lang={lang} selected={themeMode} options={themeOptions} onSelect={setThemeMode} />
+            </Card>
+            <View style={{ height: space.md }} />
+            <Card c={c}>
+              <SubLabel c={c} lang={lang} text={t(lang, 'interfaceLanguageLabel')} />
+              <ChoiceRows c={c} lang={lang} selected={lang} options={uiLangOptions} onSelect={setLang} />
+            </Card>
+            <View style={{ height: space.md }} />
+            <Card c={c}>
+              <SubLabel c={c} lang={lang} text={t(lang, 'readingLanguageLabel')} />
+              <ChoiceRows c={c} lang={lang} selected={readingLang} options={readingOptions} onSelect={setReadingLang} />
+            </Card>
           </Section>
         </SectionBoundary>
 
@@ -196,22 +202,24 @@ export default function SettingsScreen() {
 
         <SectionBoundary name="Settings.About">
           <Section c={c} lang={lang} title={t(lang, 'sectionAbout')}>
-            <Row c={c} lang={lang} label={t(lang, 'about')} onPress={() => router.push('/about' as Href)} />
-            <Row
-              c={c}
-              lang={lang}
-              label={t(lang, 'privacyLabel')}
-              onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL).catch(() => {})}
-            />
-            <Row
-              c={c}
-              lang={lang}
-              label={t(lang, 'contactLabel')}
-              // Linking, not WebBrowser: openBrowserAsync opens a Custom Tab,
-              // which has no idea what to do with a mailto: URL. This hands it
-              // to whatever mail app the phone actually has.
-              onPress={() => Linking.openURL(CONTACT_EMAIL).catch(() => {})}
-            />
+            <Card c={c}>
+              <Row c={c} lang={lang} label={t(lang, 'about')} onPress={() => router.push('/about' as Href)} />
+              <Row
+                c={c}
+                lang={lang}
+                label={t(lang, 'privacyLabel')}
+                onPress={() => WebBrowser.openBrowserAsync(PRIVACY_URL).catch(() => {})}
+              />
+              <Row
+                c={c}
+                lang={lang}
+                label={t(lang, 'contactLabel')}
+                // Linking, not WebBrowser: openBrowserAsync opens a Custom Tab,
+                // which has no idea what to do with a mailto: URL. This hands it
+                // to whatever mail app the phone actually has.
+                onPress={() => Linking.openURL(CONTACT_EMAIL).catch(() => {})}
+              />
+            </Card>
           </Section>
         </SectionBoundary>
 

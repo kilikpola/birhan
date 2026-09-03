@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Icon } from '@/components/icon';
 import { radius, space, fonts } from '@/theme/tokens';
+import { Card, Row, ToggleRow } from './rows';
 import type { Palette } from '@/theme/tokens';
 import { t, type Lang } from '@/i18n';
 import { reportError } from '@/lib/errors';
@@ -151,34 +152,24 @@ export function UpdateSection({ c, lang }: { c: Palette; lang: Lang }) {
   const available = result?.status === 'update-available' ? result.info : null;
 
   return (
-    <View style={{ gap: space.sm }}>
-      {/* Installed version */}
-      <View style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <Text style={[styles.label, { color: c.text }, isAm && styles.am]}>
-          {t(lang, 'installedVersion')}
-        </Text>
-        <Text style={[styles.value, { color: c.textFaint }]}>
-          {getCurrentVersionName()} ({getCurrentVersionCode()})
-        </Text>
-      </View>
-
-      {/* Check for updates */}
-      <Pressable
-        onPress={runCheck}
-        disabled={checking}
-        accessibilityRole="button"
-        style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.label, { color: c.text }, isAm && styles.am]}>
-            {checking ? t(lang, 'btnChecking') : t(lang, 'checkForUpdates')}
-          </Text>
-          <Text style={[styles.sub, { color: c.textFaint }, isAm && styles.amSub]}>
-            {t(lang, 'lastChecked')}: {formatLastChecked(lastChecked, lang)}
-          </Text>
-        </View>
-        {checking ? <ActivityIndicator color={c.accent} /> : <Icon name="chev" size={15} color={c.textFaint} />}
-      </Pressable>
+    <View style={{ gap: space.md }}>
+      {/* Installed version, and the check that ignores the throttle. */}
+      <Card c={c}>
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'installedVersion')}
+          value={`${getCurrentVersionName()} (${getCurrentVersionCode()})`}
+        />
+        <Row
+          c={c}
+          lang={lang}
+          label={checking ? t(lang, 'btnChecking') : t(lang, 'checkForUpdates')}
+          note={`${t(lang, 'lastChecked')}: ${formatLastChecked(lastChecked, lang)}`}
+          onPress={checking ? undefined : runCheck}
+          right={checking ? <ActivityIndicator color={c.accent} size="small" /> : undefined}
+        />
+      </Card>
 
       {/* The result — an answer, a failure, or nothing yet. Never a failure
           dressed up as "up to date". */}
@@ -260,29 +251,15 @@ export function UpdateSection({ c, lang }: { c: Palette; lang: Lang }) {
       )}
 
       {/* Wi-Fi only is the default. */}
-      <Pressable
-        onPress={toggleMobile}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: allowMobile }}
-        style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
-      >
-        <Text style={[styles.label, { color: c.text, flex: 1 }, isAm && styles.am]}>
-          {t(lang, 'allowMobileDataUpdates')}
-        </Text>
-        <View
-          style={[
-            styles.chip,
-            {
-              borderColor: allowMobile ? c.accentDim : c.border,
-              backgroundColor: allowMobile ? c.accentGlow : 'transparent',
-            },
-          ]}
-        >
-          <Text style={{ color: allowMobile ? c.accent : c.textFaint, fontSize: 11, fontWeight: '700' }}>
-            {allowMobile ? 'ON' : 'OFF'}
-          </Text>
-        </View>
-      </Pressable>
+      <Card c={c}>
+        <ToggleRow
+          c={c}
+          lang={lang}
+          label={t(lang, 'allowMobileDataUpdates')}
+          value={allowMobile}
+          onToggle={toggleMobile}
+        />
+      </Card>
     </View>
   );
 }

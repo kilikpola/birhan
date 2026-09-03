@@ -3,7 +3,7 @@ import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import { radius, space, fonts } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { t, type Lang } from '@/i18n';
-import { Row, ToggleRow } from './rows';
+import { Card, Row, ToggleRow } from './rows';
 import { reportError } from '@/lib/errors';
 import { getStorageBreakdown, clearCachedData, formatBytes, type StorageBreakdown } from '@/lib/storage';
 import {
@@ -131,40 +131,40 @@ export function DataSection({ c, lang }: { c: Palette; lang: Lang }) {
   };
 
   return (
-    <View style={{ gap: space.sm }}>
-      <Row
-        c={c}
-        lang={lang}
-        label={t(lang, 'totalStorageUsed')}
-        value={storage ? formatBytes(storage.totalBytes) : '…'}
-      />
-      <Row
-        c={c}
-        lang={lang}
-        label={t(lang, 'storageLibrary')}
-        note={t(lang, 'storageLibraryNote')}
-        value={storage ? formatBytes(storage.libraryBytes) : '…'}
-      />
-      <Row
-        c={c}
-        lang={lang}
-        label={t(lang, 'storageResources')}
-        value={storage ? formatBytes(storage.resourcesBytes) : '…'}
-      />
-      <Row
-        c={c}
-        lang={lang}
-        label={t(lang, 'storageCache')}
-        value={storage ? formatBytes(storage.cacheBytes) : '…'}
-      />
+    <View>
+      {/* What is on the phone, and the one action that frees any of it. */}
+      <Card c={c}>
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'totalStorageUsed')}
+          value={storage ? formatBytes(storage.totalBytes) : '…'}
+        />
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'storageLibrary')}
+          note={t(lang, 'storageLibraryNote')}
+          value={storage ? formatBytes(storage.libraryBytes) : '…'}
+        />
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'storageResources')}
+          value={storage ? formatBytes(storage.resourcesBytes) : '…'}
+        />
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'storageCache')}
+          value={storage ? formatBytes(storage.cacheBytes) : '…'}
+        />
+        <Row c={c} lang={lang} label={t(lang, 'clearCache')} onPress={clearCache} accent />
+      </Card>
 
-      <Pressable onPress={clearCache} accessibilityRole="button">
-        <View style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <Text style={[styles.action, { color: c.accent }, isAm && styles.actionAm]}>
-            {t(lang, 'clearCache')}
-          </Text>
-        </View>
-      </Pressable>
+      <View style={{ height: space.md }} />
+
+
 
       {/* The optional commentary download. */}
       <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -220,13 +220,16 @@ export function DataSection({ c, lang }: { c: Palette; lang: Lang }) {
         )}
       </View>
 
-      <ToggleRow
-        c={c}
-        lang={lang}
-        label={isAm ? 'በWiFi ብቻ አውርድ' : 'Download over Wi-Fi only'}
-        value={wifiOnly}
-        onToggle={toggleWifiOnly}
-      />
+      <View style={{ height: space.md }} />
+      <Card c={c}>
+        <ToggleRow
+          c={c}
+          lang={lang}
+          label={isAm ? 'በWiFi ብቻ አውርድ' : 'Download over Wi-Fi only'}
+          value={wifiOnly}
+          onToggle={toggleWifiOnly}
+        />
+      </Card>
     </View>
   );
 }
