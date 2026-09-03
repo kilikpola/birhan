@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, type Href } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -207,7 +207,10 @@ export default function SettingsScreen() {
               c={c}
               lang={lang}
               label={t(lang, 'contactLabel')}
-              onPress={() => WebBrowser.openBrowserAsync(CONTACT_EMAIL).catch(() => {})}
+              // Linking, not WebBrowser: openBrowserAsync opens a Custom Tab,
+              // which has no idea what to do with a mailto: URL. This hands it
+              // to whatever mail app the phone actually has.
+              onPress={() => Linking.openURL(CONTACT_EMAIL).catch(() => {})}
             />
           </Section>
         </SectionBoundary>

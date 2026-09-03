@@ -31,10 +31,10 @@ const expoModulesCore = path.dirname(
 
 module.exports = {
   preset: 'jest-expo',
-  // Jest owns the mobile app only. Deno tests (supabase/functions), the Vite
-  // app (admin-web) and the Vitest backend suite (backend/) run in their own
-  // CI jobs, not here.
-  testPathIgnorePatterns: ['/node_modules/', '/supabase/', '/admin-web/', '/backend/', '/tests/smoke/'],
+  // Jest owns the mobile app only. The Vite app (admin-web) and the Vitest
+  // backend suite (backend/) run in their own CI jobs, and tests/smoke runs
+  // against a deployed environment, not here.
+  testPathIgnorePatterns: ['/node_modules/', '/admin-web/', '/backend/', '/tests/smoke/'],
   moduleNameMapper: {
     '^expo-modules-core$': expoModulesCore,
     '^expo-modules-core/(.*)$': path.join(expoModulesCore, '$1'),

@@ -28,15 +28,6 @@
         "android.permission.REQUEST_INSTALL_PACKAGES"
       ]
     },
-    "updates": {
-      "url": "https://u.expo.dev/00000000-0000-0000-0000-000000000000",
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -62,13 +53,6 @@
       "expo-sqlite",
       "expo-font",
       [
-        "expo-audio",
-        {
-          "microphonePermission": false,
-          "recordAudioAndroid": false
-        }
-      ],
-      [
         "expo-notifications",
         {
           "color": "#E3A93C"
@@ -77,7 +61,8 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      "./plugins/withReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true,

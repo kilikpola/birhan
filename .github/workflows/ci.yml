@@ -44,20 +44,11 @@ jobs:
       - run: npm ci
       # No Sentry auth token in PR builds → the vite plugin disables itself and
       # the build (incl. typecheck via `tsc -b`) still validates the app.
+      # src/api.ts throws at import time without this, so the build needs a
+      # value even though CI never calls the API.
       - run: npm run build
-
-  edge:
-    name: Edge Functions — typecheck & unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-      - name: Type-check functions
-        run: deno check supabase/functions/**/*.ts
-      - name: Unit tests (shared helpers)
-        run: deno test supabase/functions/_shared/
+        env:
+          VITE_API_URL: https://api.birhan.online
 
   # Optional guard: fails the job only if lint config exists and reports errors.
   # Kept non-blocking (no eslint config committed yet); promote to required once

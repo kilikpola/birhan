@@ -1,5 +1,15 @@
 # Self-hosting the website + admin console
 
+> **Out of date, kept for the server-side parts.** This guide was written when
+> the admin console talked to Supabase from the browser and CI published it to
+> Cloudflare Pages. Neither is true now: the console calls the Birhan API
+> (`VITE_API_URL`), authorisation is enforced by the backend rather than by
+> Supabase RLS, and it is deployed by `admin-web/deploy.sh` over ssh. The
+> workflows referenced in sections 6 and 7 were removed along with Supabase.
+>
+> Sections 1–4 and 8–10 (DNS, server prep, nginx, TLS, locking down, verifying)
+> are still accurate and are why this file is still here.
+
 How to serve the Birhan **marketing site** (`website/`) and the **admin console** (`admin-web/`)
 from your own Linux VPS with nginx and Let's Encrypt.
 

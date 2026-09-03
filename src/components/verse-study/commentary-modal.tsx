@@ -7,7 +7,7 @@ import { t, type Lang } from '@/i18n';
 import { radius, space } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { reportError } from '@/lib/errors';
-import { isNetworkAllowedForDownload } from '@/lib/otaUpdates';
+import { isNetworkAllowedForDownload } from '@/lib/downloadPolicy';
 import {
   PATRISTIC_DB_SIZE_BYTES,
   formatMB,

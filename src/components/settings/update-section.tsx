@@ -20,7 +20,7 @@ import {
   getAllowMobileData,
   setAllowMobileData,
   isNetworkAllowedForDownload,
-} from '@/lib/otaUpdates';
+} from '@/lib/downloadPolicy';
 
 /**
  * Updates, in Settings.

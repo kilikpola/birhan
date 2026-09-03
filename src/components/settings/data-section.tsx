@@ -14,7 +14,7 @@ import {
   cancelPatristicDownload,
   deletePatristicDb,
 } from '@/lib/verseStudyDb';
-import { getAllowMobileData, setAllowMobileData, isNetworkAllowedForDownload } from '@/lib/otaUpdates';
+import { getAllowMobileData, setAllowMobileData, isNetworkAllowedForDownload } from '@/lib/downloadPolicy';
 
 /**
  * Data & downloads.

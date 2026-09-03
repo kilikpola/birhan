@@ -2,7 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "types": ["jest"],
+    "types": [
+      "jest"
+    ],
     "moduleResolution": "bundler",
     "paths": {
       "@/*": [
@@ -21,7 +23,6 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions/**/*",
     "admin-web",
     "backend"
   ]
