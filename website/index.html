@@ -4,585 +4,600 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ብርሃን · Birhan</title>
-<meta name="description" content="የአማርኛና የእንግሊዝኛ መጽሐፍ ቅዱስ ያለ ኢንተርኔት። Birhan — the Bible offline in Amharic and English, plus your church's announcements and documents. Free, no ads, no trackers.">
-<meta name="theme-color" content="#0B0B0D">
+<meta name="description" content="የአማርኛና የእንግሊዝኛ መጽሐፍ ቅዱስ ያለ ኢንተርኔት። The Bible offline in Amharic and English, plus your church's announcements and documents. Free, no ads, no trackers.">
+<meta name="theme-color" content="#0D0B08">
 <link rel="icon" href="/assets/favicon.png">
+<meta property="og:title" content="ብርሃን · Birhan">
+<meta property="og:description" content="The Bible offline in Amharic and English, for Ethiopian churches. Free, no ads, no trackers.">
+<meta property="og:type" content="website">
 
 <style>
-/* ------------------------------------------------------------------
+/* ==================================================================
    Birhan — birhan.online
+   No third-party hosts: the Ge'ez face is taken from the reader's own
+   system when they have one and only fetched from this origin if not.
+   No analytics, no trackers — the privacy section promises that and the
+   page has to be able to keep it.
+   ================================================================== */
 
-   Built as a page of vellum rather than a product page. Ethiopian
-   manuscripts are written in warm browns on cream, opened with a woven
-   band (ሐረግ / harag), and rubricated — the divine name and the start of
-   a book set in red rather than black. Both of those are used here as
-   typography, not ornament: እግዚአብሔር is red because that is how a scribe
-   writes it, and ብርሃን is gold because it is the word the app is named
-   after.
-
-   No third-party hosts. The Ge'ez face is tried from the reader's own
-   system first and only then fetched from this origin. English is set in
-   a humanist serif that ships with virtually every device, so the warmth
-   costs nothing to download. There are no trackers.
-   ------------------------------------------------------------------ */
-
-@font-face {
-  font-family: 'Birhan Ethiopic';
-  src: local('Noto Serif Ethiopic'), local('Noto Sans Ethiopic'),
-       local('Abyssinica SIL'), local('Nyala'), local('Kefa'),
-       url('/assets/noto-serif-ethiopic.woff2') format('woff2');
-  unicode-range: U+1200-137F, U+1380-139F, U+2D80-2DDF;
-  font-display: swap;
+@font-face{
+  font-family:'Birhan Ethiopic';
+  src:local('Noto Serif Ethiopic'),local('Noto Sans Ethiopic'),
+      local('Abyssinica SIL'),local('Nyala'),local('Kefa'),
+      url('/assets/noto-serif-ethiopic.woff2') format('woff2');
+  unicode-range:U+1200-137F,U+1380-139F,U+2D80-2DDF;
+  font-display:swap;
 }
 
-/* Light-first: the page is vellum. Dark is the lamp-lit version of the
-   same page, not a different design. */
-:root {
-  --vellum:    #F1E4CE;
-  --leaf:      #FBF3E4;
-  --edge:      #DFCDAE;
-  --edge-soft: #E8DAC2;
-  --ink:       #2A2018;
-  --ink-soft:  #6A5844;
-  --ink-faint: #94826B;
-  --gold:      #9C6F1E;
-  --gold-lit:  #C89B3F;
-  --rubric:    #A33328;
-  --olive:     #2E5A46;
-  --lapis:     #2B4A78;
+:root{
+  /* dark is the default: this is a night-reading app */
+  --bg:#0D0B08;
+  --bg-2:#141009;
+  --card:#17130D;
+  --card-2:#1E1811;
+  --line:#2A2218;
+  --line-2:#3A3021;
+  --tx:#F5EDE0;
+  --tx-2:#B5A794;
+  --tx-3:#7D7263;
+  --gold:#E3A93C;
+  --gold-2:#F3C976;
+  --gold-ink:#1A1206;
+  --glow:rgba(227,169,60,.16);
 
-  --geez: 'Birhan Ethiopic', 'Noto Serif Ethiopic', serif;
-  --serif: Iowan Old Style, 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
-  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --geez:'Birhan Ethiopic','Noto Serif Ethiopic',serif;
+  --ui:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
 
-  --measure: 33rem;
-  --step: clamp(1.03rem, .95rem + .35vw, 1.18rem);
+  --s1:.5rem; --s2:.875rem; --s3:1.25rem; --s4:2rem;
+  --s5:3rem; --s6:4.5rem; --s7:6.5rem;
+
+  --f-hero:clamp(2.35rem,7.5vw,4.15rem);
+  --f-h2:clamp(1.65rem,4.2vw,2.5rem);
+  --f-h3:1.12rem;
+  --f-body:clamp(1rem,.96rem+.2vw,1.09rem);
+
+  --shell:76rem;
+  --r:16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --vellum:    #17120D;
-    --leaf:      #1F1912;
-    --edge:      #34291D;
-    --edge-soft: #2A2118;
-    --ink:       #F0E4D0;
-    --ink-soft:  #B8A488;
-    --ink-faint: #8A7960;
-    --gold:      #E0A94A;
-    --gold-lit:  #F0C877;
-    --rubric:    #D97A66;
-    --olive:     #7FB49B;
-    --lapis:     #8FB0DC;
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#FBF7F0; --bg-2:#F4EEE3; --card:#FFFFFF; --card-2:#FAF5EC;
+    --line:#E7DECE; --line-2:#D6C9B2;
+    --tx:#1B160F; --tx-2:#5C5245; --tx-3:#8B8072;
+    --gold:#9A6C15; --gold-2:#B98A2C; --gold-ink:#FFFFFF;
+    --glow:rgba(154,108,21,.12);
   }
 }
-:root[data-theme="dark"] {
-  --vellum:    #17120D;
-  --leaf:      #1F1912;
-  --edge:      #34291D;
-  --edge-soft: #2A2118;
-  --ink:       #F0E4D0;
-  --ink-soft:  #B8A488;
-  --ink-faint: #8A7960;
-  --gold:      #E0A94A;
-  --gold-lit:  #F0C877;
-  --rubric:    #D97A66;
-  --olive:     #7FB49B;
-  --lapis:     #8FB0DC;
+:root[data-theme="light"]{
+  --bg:#FBF7F0; --bg-2:#F4EEE3; --card:#FFFFFF; --card-2:#FAF5EC;
+  --line:#E7DECE; --line-2:#D6C9B2;
+  --tx:#1B160F; --tx-2:#5C5245; --tx-3:#8B8072;
+  --gold:#9A6C15; --gold-2:#B98A2C; --gold-ink:#FFFFFF;
+  --glow:rgba(154,108,21,.12);
 }
 
-*, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-
-body {
-  margin: 0;
-  background: var(--vellum);
-  color: var(--ink);
-  font-family: var(--serif);
-  font-size: var(--step);
-  line-height: 1.68;
-  -webkit-font-smoothing: antialiased;
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
 }
 
-/* Ge'ez wants a taller line box than Latin — about 1.9. */
-[lang="am"] { font-family: var(--geez); line-height: 1.9; }
+body{
+  margin:0;background:var(--bg);color:var(--tx);
+  font-family:var(--ui);font-size:var(--f-body);line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+[lang="am"]{font-family:var(--geez);line-height:1.9}
+/* Ge'ez prose wants 1.9, but display type at 3rem+ does not — and
+   [lang="am"] outranks a bare h1, so the override has to match it. */
+h1[lang="am"]{line-height:1.24}
+h2[lang="am"]{line-height:1.4}
+h3[lang="am"],.card h3[lang="am"],.row__body h3[lang="am"]{line-height:1.55}
+.btn [lang="am"],.brand__am,.eyebrow [lang="am"],.chips [lang="am"]{line-height:1.2}
 
-.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.4rem; }
-.hero, section, footer { max-width: var(--measure); margin-inline: auto; }
-#about { --measure: 48rem; }
+.shell{width:100%;max-width:var(--shell);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:4px}
 
-a { color: var(--lapis); text-underline-offset: .18em; }
-a:focus-visible, .btn:focus-visible {
-  outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 2px;
+/* ---------------- header ---------------- */
+.hdr{
+  position:sticky;top:0;z-index:50;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.hdr__in{display:flex;align-items:center;gap:var(--s3);height:60px}
+.brand{display:flex;align-items:baseline;gap:.55rem;text-decoration:none;margin-right:auto}
+.brand__am{font-family:var(--geez);font-size:1.4rem;color:var(--gold);line-height:1}
+.brand__en{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:var(--tx-3)}
+.hdr nav{display:none;gap:var(--s3)}
+.hdr nav a{font-size:.9rem;color:var(--tx-2);text-decoration:none}
+.hdr nav a:hover{color:var(--tx)}
+@media (min-width:56rem){.hdr nav{display:flex}}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  background:var(--gold);color:var(--gold-ink);
+  font-weight:600;font-size:.95rem;text-decoration:none;
+  padding:.72rem 1.15rem;border-radius:10px;border:0;
+  transition:transform .15s ease,background .15s ease;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--gold-2);transform:translateY(-1px)}
+.btn--sm{padding:.5rem .9rem;font-size:.86rem;border-radius:8px}
+.btn--lg{padding:1rem 1.6rem;font-size:1.05rem;border-radius:12px;width:100%}
+@media (min-width:34rem){.btn--lg{width:auto}}
+.btn--ghost{background:transparent;color:var(--tx);border:1px solid var(--line-2)}
+.btn--ghost:hover{background:var(--card-2);border-color:var(--gold)}
+
+/* ---------------- hero ---------------- */
+.hero{position:relative;overflow:hidden;padding:var(--s6) 0 var(--s5)}
+.hero::before{
+  content:'';position:absolute;inset:-30% 20% auto -10%;height:70vmax;
+  background:radial-gradient(closest-side,var(--glow),transparent 72%);
+  pointer-events:none;
+}
+.hero__grid{position:relative;display:grid;gap:var(--s5);align-items:center}
+@media (min-width:60rem){.hero__grid{grid-template-columns:1.05fr .95fr;gap:var(--s6)}}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold);border:1px solid var(--line-2);
+  padding:.4rem .75rem;border-radius:999px;margin:0 0 var(--s3);
+}
+h1{
+  font-family:var(--geez);font-weight:400;
+  font-size:var(--f-hero);line-height:1.28;margin:0 0 var(--s3);
+  text-wrap:balance;
+}
+h1 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.46em;line-height:1.25;color:var(--tx-2);margin-top:.5rem;letter-spacing:-.01em}
+.hero__sub{color:var(--tx-2);font-size:1.08rem;max-width:34rem;margin:0 0 var(--s4)}
+.hero__cta{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.hero__meta{margin:var(--s3) 0 0;font-size:.9rem;color:var(--tx-2)}
+.hero__meta b{color:var(--tx);font-variant-numeric:tabular-nums}
+.hero__sha{margin:.45rem 0 0;font-size:.6rem;line-height:1.5;color:var(--tx-3);
+  word-break:break-all;font-family:ui-monospace,Menlo,monospace;max-width:30rem;opacity:.75}
+
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;list-style:none;margin:var(--s4) 0 0;padding:0}
+.chips li{
+  font-size:.8rem;color:var(--tx-2);
+  border:1px solid var(--line);border-radius:8px;padding:.35rem .65rem;
+  background:var(--card);
 }
 
-/* ---------- harag: the woven band a book opens with ---------- */
-.harag { display: block; width: 100%; height: 26px; margin: 2.5rem 0 0; }
-.harag--foot { margin: 0 0 2rem; opacity: .75; }
-
-/* ---------- the incipit ---------- */
-.hero { padding: 3rem 0 1rem; }
-
-.mark {
-  font-family: var(--geez);
-  color: var(--gold);
-  font-size: clamp(3.9rem, 16vw, 7rem);
-  line-height: 1.05;
-  margin: 1.75rem 0 0;
-  font-weight: 400;
+/* ---------------- device frame ---------------- */
+.device{
+  position:relative;margin-inline:auto;width:min(268px,72vw);
+  border:1px solid var(--line-2);border-radius:30px;padding:9px;
+  background:linear-gradient(160deg,var(--card-2),var(--card));
+  box-shadow:0 28px 70px -30px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.02) inset;
 }
-.romanised {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1rem;
-  color: var(--ink-faint);
-  margin: .3rem 0 0;
-  letter-spacing: .06em;
+.device::after{
+  content:'';position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  width:74px;height:5px;border-radius:99px;background:var(--line-2);opacity:.85;
 }
+.device img{display:block;width:100%;height:auto;border-radius:22px}
+.device--tilt{transform:rotate(-1.4deg)}
+/* In the alternating rows the phone illustrates the point rather than being
+   the point, so it sits smaller than the hero's. */
+.row .device{width:min(216px,58vw)}
 
-.verse { margin: 2.25rem 0 0; }
-.verse p { margin: 0; }
-.verse .am {
-  font-family: var(--geez);
-  font-size: clamp(1.3rem, 5vw, 1.75rem);
-  line-height: 1.9;
-}
-/* Rubrication. Red for the divine name, gold for the word this app is
-   named after — the two things a scribe would have lifted off the page. */
-.rubric { color: var(--rubric); }
-.gilt   { color: var(--gold); }
+/* ---------------- sections ---------------- */
+section{padding:var(--s6) 0;border-top:1px solid var(--line)}
+.sec-head{max-width:40rem;margin:0 0 var(--s5)}
+.kicker{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin:0 0 .6rem}
+h2{font-family:var(--geez);font-weight:400;font-size:var(--f-h2);line-height:1.45;margin:0 0 .7rem;text-wrap:balance}
+h2 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.5em;color:var(--tx-2);margin-top:.35rem}
+.sec-head p{color:var(--tx-2);margin:0}
 
-.verse .en {
-  font-style: italic;
-  color: var(--ink-soft);
-  margin-top: .9rem;
-  font-size: 1.02rem;
+/* feature cards */
+.cards{display:grid;gap:var(--s3)}
+@media (min-width:44rem){.cards{grid-template-columns:repeat(3,1fr)}}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s3);transition:border-color .18s ease,transform .18s ease;
 }
-.verse .ref {
-  font-family: var(--sans);
-  font-size: .72rem;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-top: 1rem;
-}
+.card:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.card svg{color:var(--gold);margin-bottom:.85rem}
+.card h3{font-family:var(--geez);font-weight:400;font-size:var(--f-h3);margin:0 0 .45rem;line-height:1.7}
+.card p{margin:0;color:var(--tx-2);font-size:.95rem}
 
-/* ---------- a hand's worth of warmth in the opening lines ---------- */
-.opening { margin: 2.5rem 0 0; }
-.opening p { margin: 0 0 1rem; }
-.opening .lead {
-  font-size: 1.3rem;
-  line-height: 1.55;
-  color: var(--ink);
+/* alternating rows */
+.row{display:grid;gap:var(--s4);align-items:center;margin-top:var(--s6)}
+@media (min-width:52rem){
+  .row{grid-template-columns:1fr 1fr;gap:var(--s6)}
+  .row--flip .row__media{order:2}
 }
-.opening .en { color: var(--ink-soft); }
+.row__body h3{font-family:var(--geez);font-weight:400;font-size:1.5rem;line-height:1.55;margin:0 0 .7rem}
+.row__body h3 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.52em;color:var(--tx-2);margin-top:.3rem}
+.row__body p{color:var(--tx-2);margin:0 0 .9rem}
+.row__body p:last-child{margin-bottom:0}
 
-.jump { display: flex; flex-wrap: wrap; gap: .55rem; margin: 2.25rem 0 0; padding: 0; list-style: none; }
-.jump a {
-  font-family: var(--sans);
-  font-size: .8rem;
-  color: var(--ink-soft);
-  text-decoration: none;
-  border-bottom: 1px solid var(--edge);
-  padding: .2rem 0;
+/* steps */
+.steps{counter-reset:s;display:grid;gap:var(--s3);list-style:none;padding:0;margin:0}
+@media (min-width:44rem){.steps{grid-template-columns:repeat(3,1fr)}}
+.steps li{
+  counter-increment:s;position:relative;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s3) var(--s3) var(--s3) 3.4rem;
 }
-.jump a:hover { color: var(--gold); border-color: var(--gold); }
-
-/* ---------- sections ---------- */
-section { padding: 3.5rem 0; }
-section + section { border-top: 1px solid var(--edge-soft); }
-
-h2 {
-  font-family: var(--geez);
-  font-size: 1.45rem;
-  line-height: 1.65;
-  margin: 0 0 .35rem;
-  font-weight: 400;
-  text-wrap: balance;
+.steps li::before{
+  content:counter(s);position:absolute;left:var(--s3);top:var(--s3);
+  width:1.9rem;height:1.9rem;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--glow);color:var(--gold);border:1px solid var(--line-2);
+  font-weight:700;font-size:.9rem;font-family:var(--ui);
 }
-h2 .en, h3 .en {
-  display: block;
-  font-family: var(--sans);
-  font-size: .7rem;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-top: .3rem;
-}
-h2 + p, h2 + .band { margin-top: 1.6rem; }
-h3 { font-family: var(--geez); font-size: 1.05rem; line-height: 1.75; margin: 0 0 .6rem; font-weight: 400; }
-p { margin: 0 0 1rem; }
-.en { color: var(--ink-soft); }
+.steps p{margin:0;font-size:.95rem}
+.steps .en{display:block;color:var(--tx-2);font-size:.88rem;margin-top:.35rem}
 
-.card {
-  background: var(--leaf);
-  border: 1px solid var(--edge);
-  border-radius: 3px;
-  padding: 1.3rem;
-  margin: 0 0 1rem;
+.note{
+  border:1px solid var(--line-2);border-left:3px solid var(--gold);
+  border-radius:12px;background:var(--card);padding:var(--s3);margin-top:var(--s4);
 }
-.card.warn { border-left: 3px solid var(--rubric); }
+.note h3{font-family:var(--geez);font-weight:400;font-size:1.05rem;margin:0 0 .5rem;line-height:1.7}
+.note p{margin:0 0 .7rem;font-size:.95rem}
+.note p:last-child{margin-bottom:0}
+.note .en{color:var(--tx-2)}
 
-/* ---------- bands ---------- */
-.band { display: grid; gap: 1.75rem; margin-bottom: 3.25rem; }
-.band:last-child { margin-bottom: 0; }
-.band figure { margin: 0; }
-.band img {
-  display: block; width: 100%; max-width: 240px; height: auto;
-  border-radius: 10px; border: 1px solid var(--edge);
+/* prose blocks (privacy) */
+.prose{max-width:42rem}
+.prose h3{font-family:var(--geez);font-weight:400;font-size:1.15rem;margin:var(--s4) 0 .6rem;line-height:1.75}
+.prose h3:first-child{margin-top:0}
+.prose h3 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.62em;color:var(--tx-3);margin-top:.25rem;letter-spacing:.08em;text-transform:uppercase}
+.prose p{margin:0 0 .85rem}
+.prose .en{color:var(--tx-2)}
+
+/* credits */
+.credits{display:grid;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card)}
+.credit{padding:var(--s3);border-top:1px solid var(--line)}
+.credit:first-child{border-top:0}
+.credit .name{font-size:.98rem;font-weight:600}
+.credit .lic{font-size:.83rem;color:var(--tx-3);margin-top:.25rem}
+.credit a{color:var(--gold);text-decoration:none;border-bottom:1px solid transparent}
+.credit a:hover{border-color:var(--gold)}
+
+/* download panel */
+.dl-panel{
+  background:linear-gradient(150deg,var(--card-2),var(--card));
+  border:1px solid var(--line-2);border-radius:20px;
+  padding:var(--s4);text-align:center;
 }
-.band figcaption {
-  font-family: var(--serif); font-style: italic;
-  font-size: .85rem; color: var(--ink-faint); margin-top: .65rem;
-}
-@media (min-width: 46rem) {
-  .band { grid-template-columns: 240px 1fr; align-items: center; gap: 2.75rem; }
-  .band.flip figure { order: 2; }
-}
+.dl-panel .btn{margin-inline:auto}
 
-/* ---------- download ---------- */
-.dl { text-align: center; }
-.btn {
-  display: block;
-  background: var(--gold);
-  color: var(--leaf);
-  font-family: var(--geez);
-  font-size: 1.18rem;
-  text-decoration: none;
-  padding: 1rem 1.25rem;
-  border-radius: 3px;
-  line-height: 1.6;
-}
-.btn:hover { background: var(--gold-lit); }
-.meta { margin: .9rem 0 0; font-size: .95rem; color: var(--ink-soft); }
-.meta b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.sha {
-  margin: .5rem 0 0; font-size: .64rem; color: var(--ink-faint);
-  word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
+footer{border-top:1px solid var(--line);padding:var(--s5) 0 var(--s6);color:var(--tx-3);font-size:.88rem}
+footer .shell{display:grid;gap:.4rem}
+footer a{color:var(--gold);text-decoration:none}
 
-ol, ul { margin: 0 0 1rem; padding-left: 1.15rem; }
-li { margin-bottom: .5rem; }
-
-/* ---------- credits ---------- */
-.credit { padding: .85rem 0; border-top: 1px solid var(--edge-soft); }
-.credit:first-child { border-top: 0; padding-top: 0; }
-.credit:last-child { padding-bottom: 0; }
-.name { font-size: .97rem; }
-.lic { font-family: var(--sans); font-size: .78rem; color: var(--ink-faint); margin-top: .2rem; }
-
-footer { padding: 2rem 0 4rem; color: var(--ink-faint); font-size: .88rem; }
-footer p { margin: 0 0 .35rem; }
-footer .am { font-family: var(--geez); }
-
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.reveal{opacity:0;transform:translateY(14px)}
+.reveal.in{opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none}}
 </style>
 </head>
 
 <body>
-<main class="wrap">
 
-  <!-- ================= HERO ============================================= -->
-  <header class="hero">
-  <!-- ሐረግ / harag — the woven band an Ethiopian manuscript opens with.
-       Drawn here rather than fetched: it is a few hundred bytes of SVG and
-       it tiles, so it costs nothing on a metered connection. -->
-  <svg class="harag" viewBox="0 0 240 26" preserveAspectRatio="none" role="presentation" aria-hidden="true">
-    <defs>
-      <pattern id="hg" width="60" height="26" patternUnits="userSpaceOnUse">
-        <path d="M0 13C10 1 20 1 30 13 40 25 50 25 60 13"
-              fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M0 13C10 25 20 25 30 13 40 1 50 1 60 13"
-              fill="none" stroke="var(--olive)" stroke-width="1.6" stroke-linecap="round"/>
-        <circle cx="30" cy="13" r="2.6" fill="var(--rubric)"/>
-        <circle cx="0"  cy="13" r="1.6" fill="var(--gold)"/>
-        <circle cx="60" cy="13" r="1.6" fill="var(--gold)"/>
-      </pattern>
-    </defs>
-    <rect width="240" height="26" fill="url(#hg)"/>
-  </svg>
+<header class="hdr">
+  <div class="shell hdr__in">
+    <a class="brand" href="#top">
+      <span class="brand__am" lang="am">ብርሃን</span>
+      <span class="brand__en">Birhan</span>
+    </a>
+    <nav>
+      <a href="#features">About</a>
+      <a href="#install">Install</a>
+      <a href="#credits">Credits</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+    <a class="btn btn--sm" href="#download"><span lang="am">አውርድ</span></a>
+  </div>
+</header>
 
-    <h1 class="mark" lang="am">ብርሃን</h1>
-    <p class="romanised">Birhan — “light”</p>
+<main id="top">
 
-    <div class="verse">
-      <!-- Set the way a scribe would: the divine name in red, and the word
-           the app is named after in gold. -->
-      <p class="am" lang="am"><span class="rubric">እግዚአብሔርም</span>። <span class="gilt">ብርሃን</span> ይሁን አለ፤ <span class="gilt">ብርሃንም</span> ሆነ።</p>
-      <p class="en" lang="en">And God said, Let there be light: and there was light.</p>
-      <p class="ref" lang="en">Genesis 1:3</p>
-    </div>
-
-    <div class="opening">
-      <p class="lead" lang="am">
-        መረቡ ይጠፋል። መብራቱ ይሄዳል። መጽሐፍ ቅዱሱ ግን አለ።
-      </p>
-      <p class="en" lang="en">
-        The signal drops. The power goes. The Bible is still there — all of it,
-        in Amharic and English, sitting on the phone in your hand rather than on
-        someone else’s computer.
-      </p>
-      <p class="en" lang="en">
-        Birhan was made for churches in Ethiopia: for a phone that cost less than
-        a month of data, in a room where the bars come and go. Reading never costs
-        you anything. Your church’s announcements and documents are in the same
-        place. It is free, there are no adverts, and nothing here is watching you.
-      </p>
-    </div>
-
-    <ul class="jump">
-      <li><a href="#download"><span lang="am">አውርድ</span> · Download</a></li>
-      <li><a href="#about"><span lang="am">ስለ ብርሃን</span> · About</a></li>
-      <li><a href="#credits"><span lang="am">ምንጮች</span> · Credits</a></li>
-      <li><a href="#privacy"><span lang="am">የግላዊነት</span> · Privacy</a></li>
-      <li><a href="#contact"><span lang="am">ያግኙን</span> · Contact</a></li>
-    </ul>
-  </header>
-
-  <!-- ================= WHAT IT IS ======================================= -->
-  <section id="about">
-    <h2 lang="am">ብርሃን ምንድን ነው<span class="en" lang="en">What Birhan is</span></h2>
-
-    <div class="band">
-      <figure>
-        <img src="/assets/shots/bible.webp" width="430" height="1790"
-             alt="የመጽሐፍ ቅዱስ ንባብ ገጽ — ኦሪት ዘፍጥረት ምዕራፍ ፩ በአማርኛ። The Bible reading screen showing Genesis chapter 1 in Amharic.">
-        <figcaption lang="en">Genesis 1, read with no connection</figcaption>
-      </figure>
+  <!-- ============================ HERO ============================ -->
+  <div class="hero">
+    <div class="shell hero__grid">
       <div>
-        <h3 lang="am">መጽሐፍ ቅዱስ ያለ ኢንተርኔት<span class="en" lang="en">The Bible, offline</span></h3>
-        <p lang="am">
-          ሙሉው መጽሐፍ ቅዱስ በመተግበሪያው ውስጥ ተጭኖ ይመጣል። አንዴ ከጫኑት በኋላ ምንም ዳታ
-          አይጠቀምም። አማርኛ፣ እንግሊዝኛ፣ ወይም ሁለቱንም ጎን ለጎን ማንበብ ይችላሉ።
+        <p class="eyebrow">Android · <span lang="am">ነፃ</span> · Free</p>
+
+        <h1 lang="am">መጽሐፍ ቅዱስ ያለ ኢንተርኔት።
+          <span class="en" lang="en">The Bible, with the radio off.</span>
+        </h1>
+
+        <p class="hero__sub" lang="en">
+          The whole Bible in Amharic and English, stored on your phone — plus the
+          announcements and documents from your own church. Made for Ethiopian
+          churches, and for phones that cost less than a month of data.
         </p>
-        <p class="en" lang="en">
-          The whole Bible ships inside the app. After you install it, reading
-          costs nothing — no signal, no data, no waiting. Read Amharic, English,
-          or both side by side.
+
+        <div class="hero__cta">
+          <a class="btn btn--lg" href="/downloads/birhan.apk" id="dl-btn">
+            <span lang="am">ብርሃንን አውርድ</span>
+          </a>
+          <a class="btn btn--lg btn--ghost" href="#features"><span lang="en">See what it does</span></a>
+        </div>
+
+        <p class="hero__meta" id="dl-meta">
+          <span lang="en">Checking the latest version…</span>
         </p>
+        <p class="hero__sha" id="dl-sha" hidden></p>
+
+        <ul class="chips">
+          <li><span lang="am">ማስታወቂያ የለም</span> · No ads</li>
+          <li><span lang="am">ክትትል የለም</span> · No trackers</li>
+          <li><span lang="am">ያለ ኢንተርኔት</span> · Works offline</li>
+        </ul>
+      </div>
+
+      <div class="row__media">
+        <div class="device device--tilt">
+          <img src="/assets/shots/today.webp" width="430" height="713" fetchpriority="high"
+               alt="የብርሃን መነሻ ገጽ — የዕለቱ ቃል። The Birhan home screen showing the verse of the day.">
+        </div>
       </div>
     </div>
+  </div>
 
-    <div class="band flip">
-      <figure>
-        <img src="/assets/shots/today.webp" width="430" height="1790"
-             alt="የዛሬ ገጽ — የዕለቱ ቃል እና የንባብ ቀጥል። The Today screen showing the verse of the day and a reading to continue.">
-        <figcaption lang="en">Today — the verse, and where you left off</figcaption>
-      </figure>
-      <div>
-        <h3 lang="am">የቤተ ክርስቲያንዎ መረጃ<span class="en" lang="en">Your church, in one place</span></h3>
-        <p lang="am">
-          ማስታወቂያዎች፣ ሰነዶች፣ እና የዕለቱ ቃል። የሚያዩት የራስዎ ቤተ ክርስቲያን የላከውን ብቻ ነው —
-          ሌላ ቤተ ክርስቲያን የእርስዎን ማየት አይችልም።
-        </p>
-        <p class="en" lang="en">
-          Announcements, documents, and the verse of the day. You see what your
-          own church posts, and only that — other churches cannot see yours.
-        </p>
+  <!-- ========================== FEATURES ========================== -->
+  <section id="features">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <p class="kicker">What it does</p>
+        <h2 lang="am">ሦስት ነገሮች፣ በደንብ የተሠሩ<span class="en" lang="en">Three things, done properly</span></h2>
+        <p lang="en">No feature list for its own sake — this is what people open it for.</p>
       </div>
-    </div>
 
-    <div class="band">
-      <figure>
-        <img src="/assets/shots/settings.webp" width="430" height="1790"
-             alt="የቅንብሮች ገጽ — መለያ፣ መልክ፣ ዳታና ውርዶች። The Settings screen grouped into account, appearance, and data sections.">
-        <figcaption lang="en">Settings — it tells you what it is using</figcaption>
-      </figure>
-      <div>
-        <h3 lang="am">ዳታዎ የእርስዎ ነው<span class="en" lang="en">Your data stays yours</span></h3>
-        <p lang="am">
-          ብርሃን ነፃ ነው። ማስታወቂያ የለም፣ የክትትል መሣሪያ የለም። ትልቅ ፋይል ከማውረዱ በፊት መጠኑን
-          ይነግርዎታል፣ እና ካልፈቀዱ በWiFi ብቻ ያወርዳል።
-        </p>
-        <p class="en" lang="en">
-          Birhan is free, with no advertising and nothing tracking you. It tells
-          you how many megabytes a download will cost before it starts, and stays
-          on Wi-Fi unless you say otherwise.
-        </p>
+      <div class="cards">
+        <article class="card reveal">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H11v18H5.5A2.5 2.5 0 0 1 3 18.5Z"/>
+            <path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H13v18h5.5a2.5 2.5 0 0 0 2.5-2.5Z"/>
+          </svg>
+          <h3 lang="am">ሙሉ መጽሐፍ ቅዱስ<span class="en" lang="en"></span></h3>
+          <p lang="en">Amharic and English, every book, already inside the app. Read one, or both side by side.</p>
+        </article>
+
+        <article class="card reveal">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h9"/>
+            <circle cx="19" cy="17" r="2.4"/>
+          </svg>
+          <h3 lang="am">የቤተ ክርስቲያንዎ መረጃ</h3>
+          <p lang="en">Announcements and documents from your own church — and only yours. Other churches never see it.</p>
+        </article>
+
+        <article class="card reveal">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v18M4 8h16M7 5.4h10M7 10.6h10M9.5 15h5"/>
+            <circle cx="12" cy="8" r="2.5"/>
+          </svg>
+          <h3 lang="am">የጥናት መሣሪያዎች</h3>
+          <p lang="en">Tap a verse for commentary, cross-references and word study. All of it stored locally.</p>
+        </article>
+      </div>
+
+      <!-- alternating detail rows -->
+      <div class="row reveal">
+        <div class="row__media">
+          <div class="device"><img src="/assets/shots/bible.webp" width="430" height="713" loading="lazy"
+               alt="ኦሪት ዘፍጥረት ምዕራፍ ፩ በአማርኛ። Genesis chapter 1 in Amharic."></div>
+        </div>
+        <div class="row__body">
+          <h3 lang="am">መረቡ ሲጠፋ ይሠራል<span class="en" lang="en">It works when the signal doesn't</span></h3>
+          <p lang="en">
+            The scripture is not streamed. It ships inside the app and lives on the
+            phone, so reading works in a basement, on a bus, or with the data
+            switched off entirely — and costs nothing after the first download.
+          </p>
+          <p lang="en">
+            That is the whole point. A Bible that needs a connection is not a Bible
+            you can rely on.
+          </p>
+        </div>
+      </div>
+
+      <div class="row row--flip reveal">
+        <div class="row__media">
+          <div class="device"><img src="/assets/shots/settings.webp" width="430" height="713" loading="lazy"
+               alt="የቅንብሮች ገጽ — ማከማቻና ውርዶች። The Settings screen showing storage and downloads."></div>
+        </div>
+        <div class="row__body">
+          <h3 lang="am">ዳታዎን ያከብራል<span class="en" lang="en">It respects what data costs</span></h3>
+          <p lang="en">
+            Birhan tells you the size in megabytes before any download starts, and
+            stays on Wi-Fi unless you say otherwise. Settings shows exactly what it
+            is using on your phone, and lets you clear what you don't need without
+            touching the Bible itself.
+          </p>
+          <p lang="en">
+            Free, with no advertising and nothing tracking you.
+          </p>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ================= DOWNLOAD ========================================= -->
+  <!-- =========================== DOWNLOAD ========================== -->
   <section id="download">
-    <h2 lang="am">መተግበሪያውን ያውርዱ<span class="en" lang="en">Download the app</span></h2>
+    <div class="shell">
+      <div class="sec-head reveal">
+        <p class="kicker">Get it</p>
+        <h2 lang="am">መተግበሪያውን ያውርዱ<span class="en" lang="en">Download the app</span></h2>
+      </div>
 
-    <div class="card dl">
-      <!-- Never changes, never breaks: the same path the old site served, so
-           links people already have keep working. The version and size beside
-           it come from the update manifest at runtime. -->
-      <a class="btn" href="/downloads/birhan.apk" id="dl-btn">
-        <span lang="am">ብርሃንን አውርድ</span>
-      </a>
-      <p class="meta" id="dl-meta">
-        <span lang="am">የፋይሉ መጠን በመጫን ላይ…</span>
-        <span lang="en">Checking the latest version…</span>
-      </p>
-      <p class="sha" id="dl-sha" hidden></p>
+      <div class="dl-panel reveal">
+        <a class="btn btn--lg" href="/downloads/birhan.apk" id="dl-btn-2">
+          <span lang="am">ብርሃንን አውርድ</span>
+        </a>
+        <p class="hero__meta" id="dl-meta-2"><span lang="en">Checking the latest version…</span></p>
+      </div>
+
+      <div class="note reveal">
+        <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ<span class="en" lang="en"></span></h3>
+        <p lang="am">
+          አንድሮይድ በተለያየ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ከዚህ በፊት የሙከራ (debug) ስሪት ጭነው
+          ከነበረ፣ አዲሱን ከመጫንዎ በፊት አሮጌውን <b>ማራገፍ (uninstall)</b> አለብዎት። አለበለዚያ
+          “App not installed” የሚል መልእክት ይመጣል።
+        </p>
+        <p class="en" lang="en">
+          Android refuses to update an app signed with a different key. If you have
+          an older debug-signed build, you must <b>uninstall it first</b> — otherwise
+          the install fails with “App not installed”. Your Bible reading works
+          offline either way; only your sign-in is lost, and you can sign back in.
+        </p>
+      </div>
     </div>
+  </section>
 
-    <div class="card warn">
-      <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ<span class="en" lang="en">If you installed an earlier test build</span></h3>
-      <p lang="am">
-        አንድሮይድ በተለያየ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ከዚህ በፊት የሙከራ (debug) ስሪት ጭነው
-        ከነበረ፣ አዲሱን ከመጫንዎ በፊት አሮጌውን <b>ማራገፍ (uninstall)</b> አለብዎት። አለበለዚያ
-        “App not installed” የሚል መልእክት ይመጣል።
-      </p>
-      <p class="en" lang="en">
-        Android refuses to update an app signed with a different key. If you have
-        an older debug-signed build, you must <b>uninstall it first</b> — otherwise
-        the install fails with “App not installed”. Your Bible reading works
-        offline either way; only your sign-in is lost, and you can sign back in.
-      </p>
-    </div>
+  <!-- ============================ INSTALL ========================== -->
+  <section id="install">
+    <div class="shell">
+      <div class="sec-head reveal">
+        <p class="kicker">Three steps</p>
+        <h2 lang="am">እንዴት እንደሚጭኑ<span class="en" lang="en">How to install</span></h2>
+        <p lang="en">Birhan is not on the Play Store, so Android asks once for permission.</p>
+      </div>
 
-    <div class="card">
-      <h3 lang="am">እንዴት እንደሚጭኑ<span class="en" lang="en">How to install</span></h3>
-      <ol lang="am">
-        <li>ከላይ ያለውን የማውረጃ ቁልፍ ይጫኑ።</li>
-        <li>ማውረዱ ሲጨርስ ፋይሉን ይክፈቱ።</li>
-        <li>አንድሮይድ ፈቃድ ሲጠይቅ <b>“ከማይታወቁ ምንጮች መጫን ፍቀድ”</b> የሚለውን ያብሩ። ብርሃን በ Play Store ላይ ስለሌለ ይህ ያስፈልጋል።</li>
-        <li><b>ጫን (Install)</b> የሚለውን ይጫኑ።</li>
+      <ol class="steps reveal">
+        <li>
+          <p lang="am">ከላይ ያለውን የማውረጃ ቁልፍ ይጫኑ፣ ማውረዱ ሲጨርስ ፋይሉን ይክፈቱ።</p>
+          <p class="en" lang="en">Tap download, then open the file when it finishes.</p>
+        </li>
+        <li>
+          <p lang="am">አንድሮይድ ሲጠይቅ <b>“ከማይታወቁ ምንጮች መጫን ፍቀድ”</b> የሚለውን ያብሩ።</p>
+          <p class="en" lang="en">Allow “install from unknown sources” when Android asks.</p>
+        </li>
+        <li>
+          <p lang="am"><b>ጫን (Install)</b> የሚለውን ይጫኑ።</p>
+          <p class="en" lang="en">Tap Install. That's it.</p>
+        </li>
       </ol>
-      <ul lang="en" class="en">
-        <li>Tap the download button above.</li>
-        <li>Open the file when the download finishes.</li>
-        <li>When Android asks, allow <b>“install from unknown sources”</b> — Birhan is not on the Play Store, so this is required.</li>
-        <li>Tap <b>Install</b>.</li>
-      </ul>
     </div>
   </section>
 
-  <!-- ================= CREDITS ========================================== -->
+  <!-- ============================ CREDITS ========================== -->
   <section id="credits">
-    <h2 lang="am">ምንጮች እና ፈቃዶች<span class="en" lang="en">Sources &amp; licences</span></h2>
-    <p lang="am">ይህ መተግበሪያ ከሚከተሉት ክፍት ምንጮች የተውጣጡ ጽሑፎችን ይጠቀማል፦</p>
-    <p class="en" lang="en">This app uses text from the following open sources:</p>
+    <div class="shell">
+      <div class="sec-head reveal">
+        <p class="kicker">Sources</p>
+        <h2 lang="am">ምንጮች እና ፈቃዶች<span class="en" lang="en">Sources &amp; licences</span></h2>
+        <p lang="en">Birhan is built on open texts. These are the people whose work it carries.</p>
+      </div>
 
-    <div class="card">
-      <div class="credit">
-        <div class="name">King James Version (1611)</div>
-        <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
-          <a href="https://en.wikipedia.org/wiki/King_James_Version#Copyright_status" rel="noopener">status</a></div>
-      </div>
-      <div class="credit">
-        <div class="name">OpenBible.info Cross References</div>
-        <div class="lic">CC-BY 4.0 ·
-          <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">licence</a> ·
-          <a href="https://www.openbible.info/labs/cross-references/" rel="noopener">source</a></div>
-      </div>
-      <div class="credit">
-        <div class="name">Strong's Hebrew &amp; Greek Dictionaries (Open Scriptures)</div>
-        <div class="lic">CC-BY-SA 3.0 ·
-          <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noopener">licence</a> ·
-          <a href="https://github.com/openscriptures/strongs" rel="noopener">source</a></div>
-      </div>
-      <div class="credit">
-        <div class="name">Matthew Henry's Concise Commentary (CrossWire SWORD)</div>
-        <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
-          <a href="https://crosswire.org/sword/modules/ModInfo.jsp?modName=MHCC" rel="noopener">source</a></div>
-      </div>
-      <div class="credit">
-        <div class="name">HistoricalChristianFaith / Commentaries-Database (Church Fathers)</div>
-        <div class="lic"><span lang="am">የህዝብ ንብረት ውክልና</span> · Public domain dedication ·
-          <a href="https://github.com/HistoricalChristianFaith/Commentaries-Database" rel="noopener">source</a></div>
+      <div class="credits reveal">
+        <div class="credit">
+          <div class="name">King James Version (1611)</div>
+          <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
+            <a href="https://en.wikipedia.org/wiki/King_James_Version#Copyright_status" rel="noopener">status</a></div>
+        </div>
+        <div class="credit">
+          <div class="name">OpenBible.info Cross References</div>
+          <div class="lic">CC-BY 4.0 ·
+            <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">licence</a> ·
+            <a href="https://www.openbible.info/labs/cross-references/" rel="noopener">source</a></div>
+        </div>
+        <div class="credit">
+          <div class="name">Strong's Hebrew &amp; Greek Dictionaries (Open Scriptures)</div>
+          <div class="lic">CC-BY-SA 3.0 ·
+            <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noopener">licence</a> ·
+            <a href="https://github.com/openscriptures/strongs" rel="noopener">source</a></div>
+        </div>
+        <div class="credit">
+          <div class="name">Matthew Henry's Concise Commentary (CrossWire SWORD)</div>
+          <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
+            <a href="https://crosswire.org/sword/modules/ModInfo.jsp?modName=MHCC" rel="noopener">source</a></div>
+        </div>
+        <div class="credit">
+          <div class="name">HistoricalChristianFaith / Commentaries-Database (Church Fathers)</div>
+          <div class="lic"><span lang="am">የህዝብ ንብረት ውክልና</span> · Public domain dedication ·
+            <a href="https://github.com/HistoricalChristianFaith/Commentaries-Database" rel="noopener">source</a></div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ================= PRIVACY ========================================== -->
+  <!-- ============================ PRIVACY ========================== -->
   <section id="privacy">
-    <h2 lang="am">የግላዊነት መግለጫ<span class="en" lang="en">Privacy</span></h2>
+    <div class="shell">
+      <div class="sec-head reveal">
+        <p class="kicker">Privacy</p>
+        <h2 lang="am">የግላዊነት መግለጫ<span class="en" lang="en">What we collect, and who sees it</span></h2>
+      </div>
 
-    <h3 lang="am">ምን እንሰበስባለን<span class="en" lang="en">What we collect</span></h3>
-    <p lang="am">
-      ስምዎን፣ የመረጡትን ቤተ ክርስቲያንና ቅርንጫፍ፣ እና በቤተ ክርስቲያኑ ውስጥ ያለዎትን ድርሻ። ኢሜይል ወይም
-      ስልክ ቁጥር — ቢያንስ አንዱ ያስፈልጋል። መለያዎን ሲከፍቱ የቴሌግራም መለያዎን እናረጋግጣለን፤ ይህም እርስዎ
-      እውነተኛ ሰው መሆንዎን ለማወቅ ነው።
-    </p>
-    <p class="en" lang="en">
-      Your name, the church and branch you choose, and your role in that church.
-      An email address or a phone number — at least one is required. When you
-      register we confirm your Telegram account, to establish that you are a real
-      person.
-    </p>
+      <div class="prose reveal">
+        <h3 lang="am">ምን እንሰበስባለን<span class="en" lang="en">What we collect</span></h3>
+        <p lang="am">
+          ስምዎን፣ የመረጡትን ቤተ ክርስቲያንና ቅርንጫፍ፣ እና በቤተ ክርስቲያኑ ውስጥ ያለዎትን ድርሻ። ኢሜይል ወይም
+          ስልክ ቁጥር — ቢያንስ አንዱ ያስፈልጋል። መለያዎን ሲከፍቱ የቴሌግራም መለያዎን እናረጋግጣለን፤ ይህም እርስዎ
+          እውነተኛ ሰው መሆንዎን ለማወቅ ነው።
+        </p>
+        <p class="en" lang="en">
+          Your name, the church and branch you choose, and your role in that church.
+          An email address or a phone number — at least one is required. When you
+          register we confirm your Telegram account, to establish that you are a real
+          person.
+        </p>
 
-    <h3 lang="am">ማን ሊያየው ይችላል<span class="en" lang="en">Who can see it</span></h3>
-    <p lang="am">
-      የአባልነት መረጃዎ የሚታየው በራስዎ ቤተ ክርስቲያን ውስጥ ብቻ ነው። ሌሎች አብያተ ክርስቲያናት ሊያዩት
-      አይችሉም። ብርሃን መረጃዎን አይሸጥም፣ ለማስታወቂያም አይጠቀምበትም። የክትትል መሣሪያ የለም።
-    </p>
-    <p class="en" lang="en">
-      Your membership details are visible only within your own church. Other
-      churches cannot see them. Birhan does not sell your data or use it for
-      advertising, and there are no trackers.
-    </p>
-    <p class="en" lang="en">
-      This matters more than usual: this data says which church you belong to,
-      and therefore something about your religious affiliation. It is treated
-      accordingly.
-    </p>
+        <h3 lang="am">ማን ሊያየው ይችላል<span class="en" lang="en">Who can see it</span></h3>
+        <p lang="am">
+          የአባልነት መረጃዎ የሚታየው በራስዎ ቤተ ክርስቲያን ውስጥ ብቻ ነው። ሌሎች አብያተ ክርስቲያናት ሊያዩት
+          አይችሉም። ብርሃን መረጃዎን አይሸጥም፣ ለማስታወቂያም አይጠቀምበትም። የክትትል መሣሪያ የለም።
+        </p>
+        <p class="en" lang="en">
+          Your membership details are visible only within your own church. Other
+          churches cannot see them. Birhan does not sell your data or use it for
+          advertising, and there are no trackers.
+        </p>
+        <p class="en" lang="en">
+          This matters more than usual: this data says which church you belong to,
+          and therefore something about your religious affiliation. It is treated
+          accordingly.
+        </p>
 
-    <h3 lang="am">መለያዎን መሰረዝ<span class="en" lang="en">Deleting your account</span></h3>
-    <p lang="am">
-      በመተግበሪያው ውስጥ <b>ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
-      ከሚያስተዳድራቸው የቤተ ክርስቲያን ቴሌግራም ቡድኖች ይወጣሉ። ያለፉ መልሶችዎ ይቀራሉ፣ ነገር ግን ስምዎ
-      ተነስቶ “የተሰረዘ ተጠቃሚ” ተብሎ ይታያል። ይህ የማይቀለበስ ነው።
-    </p>
-    <p class="en" lang="en">
-      In the app, go to <b>Settings → Delete my account</b>. Your account is
-      deleted and you are removed from the church Telegram groups Birhan manages.
-      Past replies stay, with your name taken off them and shown as “Deleted
-      user”, so conversations still make sense. This cannot be undone.
-    </p>
+        <h3 lang="am">መለያዎን መሰረዝ<span class="en" lang="en">Deleting your account</span></h3>
+        <p lang="am">
+          በመተግበሪያው ውስጥ <b>ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
+          ከሚያስተዳድራቸው የቤተ ክርስቲያን ቴሌግራም ቡድኖች ይወጣሉ። ያለፉ መልሶችዎ ይቀራሉ፣ ነገር ግን ስምዎ
+          ተነስቶ “የተሰረዘ ተጠቃሚ” ተብሎ ይታያል። ይህ የማይቀለበስ ነው።
+        </p>
+        <p class="en" lang="en">
+          In the app, go to <b>Settings → Delete my account</b>. Your account is
+          deleted and you are removed from the church Telegram groups Birhan manages.
+          Past replies stay, with your name taken off them and shown as “Deleted
+          user”, so conversations still make sense. This cannot be undone.
+        </p>
+      </div>
+    </div>
   </section>
-
-  <!-- ================= CONTACT ========================================== -->
-  <section id="contact">
-    <h2 lang="am">ያግኙን<span class="en" lang="en">Contact</span></h2>
-    <p lang="am">
-      ጥያቄ ካለዎት፣ ወይም ቤተ ክርስቲያንዎን ማስመዝገብ ከፈለጉ፣ በኢሜይል ያግኙን።
-    </p>
-    <p class="en" lang="en">
-      Questions, or want your church added? Email
-      <a href="mailto:hello@birhan.online">hello@birhan.online</a>.
-    </p>
-  </section>
-
-  <svg class="harag harag--foot" viewBox="0 0 240 26" preserveAspectRatio="none" role="presentation" aria-hidden="true">
-    <rect width="240" height="26" fill="url(#hg)"/>
-  </svg>
-
-  <footer>
-    <p class="am" lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት በፍቅር የተሠራ።</p>
-    <p lang="en">Birhan · made for Ethiopian churches · Android, for now.</p>
-  </footer>
 
 </main>
 
+<footer>
+  <div class="shell">
+    <p lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት።</p>
+    <p lang="en">Questions, or want your church added? <a href="mailto:hello@birhan.online">hello@birhan.online</a></p>
+    <p lang="en">Android only, for now.</p>
+  </div>
+</footer>
+
 <script>
-/* The only script on the page.
- *
- * Fills in the version and the download size from the update manifest, so this
- * page cannot go stale the way a hardcoded "v1.0.4 — 148 MB" would. The button
- * above already works without it: the href is a real, unchanging path, and
- * everything here only adds detail beside it.
- *
- * Order matters. Same-origin first, because it needs no CORS and is deployed
- * alongside the very APK it describes. The canonical manifest on
- * updates.birhan.online is the fallback, and reaching it needs
- * Access-Control-Allow-Origin on that host.
- */
+/* Version and size come from the update manifest, so this page cannot go
+   stale the way a hardcoded "v1.0.4 — 148 MB" would. Both download buttons
+   already work without it: their href is a real, unchanging path.
+
+   Same-origin first — it needs no CORS and is deployed beside the very APK
+   it describes. updates.birhan.online is the canonical fallback. */
 (function () {
-  var SOURCES = [
-    '/latest.json',
-    'https://updates.birhan.online/birhan/latest.json'
-  ];
-
-  var meta = document.getElementById('dl-meta');
+  var SOURCES = ['/latest.json', 'https://updates.birhan.online/birhan/latest.json'];
+  var metas = [document.getElementById('dl-meta'), document.getElementById('dl-meta-2')];
+  var btns  = [document.getElementById('dl-btn'),  document.getElementById('dl-btn-2')];
   var shaEl = document.getElementById('dl-sha');
-  var btn = document.getElementById('dl-btn');
 
-  /* Only ever repoint the button at our own HTTPS host. The manifest is ours,
+  /* Only ever repoint a button at our own HTTPS host. The manifest is ours,
      but a download button is exactly the thing you do not want following an
      arbitrary URL if that file is ever tampered with. */
   function safeApkUrl(u) {
@@ -594,39 +609,31 @@ footer .am { font-family: var(--geez); }
     } catch (e) { return null; }
   }
 
-  function mb(bytes) {
-    return (bytes / 1048576).toFixed(0);
-  }
-
   function render(m) {
     var bits = [];
     if (m.versionName) bits.push('v' + m.versionName);
-    if (m.sizeBytes) bits.push(mb(m.sizeBytes) + ' MB');
+    if (m.sizeBytes) bits.push((m.sizeBytes / 1048576).toFixed(0) + ' MB');
     if (!bits.length) return false;
 
-    /* Point the button at the exact build the manifest describes, so the
-       version, the size and the file people receive can never disagree. The
-       static href stays as the fallback if the manifest cannot be read. */
     var href = m.apkUrl && safeApkUrl(m.apkUrl);
-    if (href && btn) btn.setAttribute('href', href);
+    btns.forEach(function (b) { if (b && href) b.setAttribute('href', href); });
 
-    // Size before the tap, in MB, every time — the same data-cost discipline
-    // the app itself applies before it downloads anything.
-    meta.innerHTML =
-      '<span lang="am">መጠን፡ <b>' + bits.join(' · ') + '</b></span><br>' +
-      '<span lang="en">Version and size: <b>' + bits.join(' · ') + '</b></span>';
+    // Size before the tap, every time — the same data-cost discipline the app
+    // itself applies before it downloads anything.
+    metas.forEach(function (el) {
+      if (!el) return;
+      el.innerHTML = '<span lang="am">መጠን</span> · <span lang="en">Size</span>: ' +
+                     '<b>' + bits.join(' · ') + '</b>';
+    });
 
-    if (m.sha256) {
-      shaEl.textContent = 'SHA-256 ' + m.sha256;
-      shaEl.hidden = false;
-    }
+    if (m.sha256 && shaEl) { shaEl.textContent = 'SHA-256 ' + m.sha256; shaEl.hidden = false; }
     return true;
   }
 
   function fallback() {
-    meta.innerHTML =
-      '<span lang="am">የፋይሉን መጠን ማወቅ አልተቻለም። ማውረዱ ግን ይሠራል።</span><br>' +
-      '<span lang="en">Could not check the version right now — the download still works.</span>';
+    metas.forEach(function (el) {
+      if (el) el.innerHTML = '<span lang="en">Could not check the version right now — the download still works.</span>';
+    });
   }
 
   function tryNext(i) {
@@ -636,8 +643,22 @@ footer .am { font-family: var(--geez); }
       .then(function (m) { if (!render(m)) return Promise.reject(); })
       .catch(function () { tryNext(i + 1); });
   }
-
   tryNext(0);
+
+  /* Reveal on scroll. Anything not observed stays visible, so the page is
+     fully readable if this never runs. */
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    els.forEach(function (e) { e.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+    });
+  }, { rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (e) { io.observe(e); });
 })();
 </script>
 </body>
