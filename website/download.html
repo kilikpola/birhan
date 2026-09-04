@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="am" data-lang="am">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ብርሃንን ማውረድ · Download Birhan</title>
+<meta name="description" content="Download Birhan for Android — the current release and every earlier version.">
+<meta name="theme-color" content="#0D0B08">
+<link rel="icon" href="/assets/favicon.png">
+<style>
+/* ==================================================================
+   Birhan — birhan.online
+   No third-party hosts: the Ge'ez face is taken from the reader's own
+   system when they have one and only fetched from this origin if not.
+   No analytics, no trackers — the privacy section promises that and the
+   page has to be able to keep it.
+   ================================================================== */
+
+@font-face{
+  font-family:'Birhan Ethiopic';
+  src:local('Noto Serif Ethiopic'),local('Noto Sans Ethiopic'),
+      local('Abyssinica SIL'),local('Nyala'),local('Kefa'),
+      url('/assets/noto-serif-ethiopic.woff2') format('woff2');
+  unicode-range:U+1200-137F,U+1380-139F,U+2D80-2DDF;
+  font-display:swap;
+}
+
+:root{
+  /* dark is the default: this is a night-reading app */
+  --bg:#0D0B08;
+  --bg-2:#141009;
+  --card:#17130D;
+  --card-2:#1E1811;
+  --line:#2A2218;
+  --line-2:#3A3021;
+  --tx:#F5EDE0;
+  --tx-2:#B5A794;
+  --tx-3:#7D7263;
+  --gold:#E3A93C;
+  --gold-2:#F3C976;
+  --gold-ink:#1A1206;
+  --glow:rgba(227,169,60,.16);
+
+  --geez:'Birhan Ethiopic','Noto Serif Ethiopic',serif;
+  --ui:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+
+  --s1:.5rem; --s2:.875rem; --s3:1.25rem; --s4:2rem;
+  --s5:3rem; --s6:4.5rem; --s7:6.5rem;
+
+  --f-hero:clamp(2.35rem,7.5vw,4.15rem);
+  --f-h2:clamp(1.65rem,4.2vw,2.5rem);
+  --f-h3:1.12rem;
+  --f-body:clamp(1rem,.96rem+.2vw,1.09rem);
+
+  --shell:76rem;
+  --r:16px;
+}
+
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#FBF7F0; --bg-2:#F4EEE3; --card:#FFFFFF; --card-2:#FAF5EC;
+    --line:#E7DECE; --line-2:#D6C9B2;
+    --tx:#1B160F; --tx-2:#5C5245; --tx-3:#8B8072;
+    --gold:#9A6C15; --gold-2:#B98A2C; --gold-ink:#FFFFFF;
+    --glow:rgba(154,108,21,.12);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#FBF7F0; --bg-2:#F4EEE3; --card:#FFFFFF; --card-2:#FAF5EC;
+  --line:#E7DECE; --line-2:#D6C9B2;
+  --tx:#1B160F; --tx-2:#5C5245; --tx-3:#8B8072;
+  --gold:#9A6C15; --gold-2:#B98A2C; --gold-ink:#FFFFFF;
+  --glow:rgba(154,108,21,.12);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition:none!important}
+}
+
+body{
+  margin:0;background:var(--bg);color:var(--tx);
+  font-family:var(--ui);font-size:var(--f-body);line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+[lang="am"]{font-family:var(--geez);line-height:1.9}
+
+/* One language at a time. Mixing both on every line made the page twice as
+   long and half as readable — a reader only ever needs one of them. The
+   wordmark is marked data-keep because ብርሃን is the name, not a translation. */
+html[data-lang="am"] [lang="en"]:not([data-keep]){display:none}
+html[data-lang="en"] [lang="am"]:not([data-keep]){display:none}
+
+.langsw{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.langsw button{
+  appearance:none;border:0;background:transparent;color:var(--tx-2);
+  font:inherit;font-size:.82rem;padding:.4rem .7rem;cursor:pointer;line-height:1.4;
+}
+.langsw button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);font-weight:600}
+.langsw button:not([aria-pressed="true"]):hover{color:var(--tx)}
+/* Ge'ez prose wants 1.9, but display type at 3rem+ does not — and
+   [lang="am"] outranks a bare h1, so the override has to match it. */
+h1[lang="am"]{line-height:1.24}
+h2[lang="am"]{line-height:1.4}
+h3[lang="am"],.card h3[lang="am"],.row__body h3[lang="am"]{line-height:1.55}
+.btn [lang="am"],.brand__am,.eyebrow [lang="am"],.chips [lang="am"]{line-height:1.2}
+
+.shell{width:100%;max-width:var(--shell);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:4px}
+
+/* ---------------- header ---------------- */
+.hdr{
+  position:sticky;top:0;z-index:50;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.hdr__in{display:flex;align-items:center;gap:var(--s3);height:60px}
+.brand{display:flex;align-items:baseline;gap:.55rem;text-decoration:none;margin-right:auto}
+.brand__am{font-family:var(--geez);font-size:1.4rem;color:var(--gold);line-height:1}
+.brand__en{font-size:.7rem;letter-spacing:.24em;text-transform:uppercase;color:var(--tx-3)}
+.hdr nav{display:none;gap:var(--s3)}
+.hdr nav a{font-size:.9rem;color:var(--tx-2);text-decoration:none}
+.hdr nav a:hover{color:var(--tx)}
+@media (min-width:56rem){.hdr nav{display:flex}}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+  background:var(--gold);color:var(--gold-ink);
+  font-weight:600;font-size:.95rem;text-decoration:none;
+  padding:.72rem 1.15rem;border-radius:10px;border:0;
+  transition:transform .15s ease,background .15s ease;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--gold-2);transform:translateY(-1px)}
+.btn--sm{padding:.5rem .9rem;font-size:.86rem;border-radius:8px}
+.btn--lg{padding:1rem 1.6rem;font-size:1.05rem;border-radius:12px;width:100%}
+@media (min-width:34rem){.btn--lg{width:auto}}
+.btn--ghost{background:transparent;color:var(--tx);border:1px solid var(--line-2)}
+.btn--ghost:hover{background:var(--card-2);border-color:var(--gold)}
+
+/* ---------------- hero ---------------- */
+.hero{position:relative;overflow:hidden;padding:var(--s6) 0 var(--s5)}
+.hero::before{
+  content:'';position:absolute;inset:-30% 20% auto -10%;height:70vmax;
+  background:radial-gradient(closest-side,var(--glow),transparent 72%);
+  pointer-events:none;
+}
+.hero__grid{position:relative;display:grid;gap:var(--s5);align-items:center}
+@media (min-width:60rem){.hero__grid{grid-template-columns:1.05fr .95fr;gap:var(--s6)}}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold);border:1px solid var(--line-2);
+  padding:.4rem .75rem;border-radius:999px;margin:0 0 var(--s3);
+}
+h1{
+  font-family:var(--geez);font-weight:400;
+  font-size:var(--f-hero);line-height:1.28;margin:0 0 var(--s3);
+  text-wrap:balance;
+}
+h1 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.46em;line-height:1.25;color:var(--tx-2);margin-top:.5rem;letter-spacing:-.01em}
+.hero__sub{color:var(--tx-2);font-size:1.08rem;max-width:34rem;margin:0 0 var(--s4)}
+.hero__cta{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.hero__meta{margin:var(--s3) 0 0;font-size:.9rem;color:var(--tx-2)}
+.hero__meta b{color:var(--tx);font-variant-numeric:tabular-nums}
+.hero__sha{margin:.45rem 0 0;font-size:.6rem;line-height:1.5;color:var(--tx-3);
+  word-break:break-all;font-family:ui-monospace,Menlo,monospace;max-width:30rem;opacity:.75}
+
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;list-style:none;margin:var(--s4) 0 0;padding:0}
+.chips li{
+  font-size:.8rem;color:var(--tx-2);
+  border:1px solid var(--line);border-radius:8px;padding:.35rem .65rem;
+  background:var(--card);
+}
+
+/* ---------------- device frame ---------------- */
+.device{
+  position:relative;margin-inline:auto;width:min(268px,72vw);
+  border:1px solid var(--line-2);border-radius:30px;padding:9px;
+  background:linear-gradient(160deg,var(--card-2),var(--card));
+  box-shadow:0 28px 70px -30px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.02) inset;
+}
+.device::after{
+  content:'';position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  width:74px;height:5px;border-radius:99px;background:var(--line-2);opacity:.85;
+}
+.device img{display:block;width:100%;height:auto;border-radius:22px}
+.device--tilt{transform:rotate(-1.4deg)}
+/* In the alternating rows the phone illustrates the point rather than being
+   the point, so it sits smaller than the hero's. */
+.row .device{width:min(216px,58vw)}
+
+/* ---------------- sections ---------------- */
+section{padding:var(--s6) 0;border-top:1px solid var(--line)}
+.sec-head{max-width:40rem;margin:0 0 var(--s5)}
+.kicker{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin:0 0 .6rem}
+h2{font-family:var(--geez);font-weight:400;font-size:var(--f-h2);line-height:1.45;margin:0 0 .7rem;text-wrap:balance}
+h2 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.5em;color:var(--tx-2);margin-top:.35rem}
+.sec-head p{color:var(--tx-2);margin:0}
+
+/* feature cards */
+.cards{display:grid;gap:var(--s3)}
+@media (min-width:44rem){.cards{grid-template-columns:repeat(3,1fr)}}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s3);transition:border-color .18s ease,transform .18s ease;
+}
+.card:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.card svg{color:var(--gold);margin-bottom:.85rem}
+.card h3{font-family:var(--geez);font-weight:400;font-size:var(--f-h3);margin:0 0 .45rem;line-height:1.7}
+.card p{margin:0;color:var(--tx-2);font-size:.95rem}
+
+/* alternating rows */
+.row{display:grid;gap:var(--s4);align-items:center;margin-top:var(--s6)}
+@media (min-width:52rem){
+  .row{grid-template-columns:1fr 1fr;gap:var(--s6)}
+  .row--flip .row__media{order:2}
+}
+.row__body h3{font-family:var(--geez);font-weight:400;font-size:1.5rem;line-height:1.55;margin:0 0 .7rem}
+.row__body h3 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.52em;color:var(--tx-2);margin-top:.3rem}
+.row__body p{color:var(--tx-2);margin:0 0 .9rem}
+.row__body p:last-child{margin-bottom:0}
+
+/* steps */
+.steps{counter-reset:s;display:grid;gap:var(--s3);list-style:none;padding:0;margin:0}
+@media (min-width:44rem){.steps{grid-template-columns:repeat(3,1fr)}}
+.steps li{
+  counter-increment:s;position:relative;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s3) var(--s3) var(--s3) 3.4rem;
+}
+.steps li::before{
+  content:counter(s);position:absolute;left:var(--s3);top:var(--s3);
+  width:1.9rem;height:1.9rem;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--glow);color:var(--gold);border:1px solid var(--line-2);
+  font-weight:700;font-size:.9rem;font-family:var(--ui);
+}
+.steps p{margin:0;font-size:.95rem}
+.steps .en{display:block;color:var(--tx-2);font-size:.88rem;margin-top:.35rem}
+
+.note{
+  border:1px solid var(--line-2);border-left:3px solid var(--gold);
+  border-radius:12px;background:var(--card);padding:var(--s3);margin-top:var(--s4);
+}
+.note h3{font-family:var(--geez);font-weight:400;font-size:1.05rem;margin:0 0 .5rem;line-height:1.7}
+.note p{margin:0 0 .7rem;font-size:.95rem}
+.note p:last-child{margin-bottom:0}
+.note .en{color:var(--tx-2)}
+
+/* prose blocks (privacy) */
+.prose{max-width:42rem}
+.prose h3{font-family:var(--geez);font-weight:400;font-size:1.15rem;margin:var(--s4) 0 .6rem;line-height:1.75}
+.prose h3:first-child{margin-top:0}
+.prose h3 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.62em;color:var(--tx-3);margin-top:.25rem;letter-spacing:.08em;text-transform:uppercase}
+.prose p{margin:0 0 .85rem}
+.prose .en{color:var(--tx-2)}
+
+/* credits */
+.credits{display:grid;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card)}
+.credit{padding:var(--s3);border-top:1px solid var(--line)}
+.credit:first-child{border-top:0}
+.credit .name{font-size:.98rem;font-weight:600}
+.credit .lic{font-size:.83rem;color:var(--tx-3);margin-top:.3rem;display:flex;flex-wrap:wrap;gap:.9rem;align-items:baseline}
+.credit a{color:var(--gold);text-decoration:none;border-bottom:1px solid transparent}
+.credit a:hover{border-color:var(--gold)}
+
+/* download panel */
+.dl-panel{
+  background:linear-gradient(150deg,var(--card-2),var(--card));
+  border:1px solid var(--line-2);border-radius:20px;
+  padding:var(--s4);text-align:center;
+}
+.dl-panel .btn{margin-inline:auto}
+
+footer{border-top:1px solid var(--line);padding:var(--s5) 0 var(--s6);color:var(--tx-3);font-size:.88rem}
+footer .shell{display:grid;gap:.4rem}
+footer a{color:var(--gold);text-decoration:none}
+
+.reveal{opacity:0;transform:translateY(14px)}
+.reveal.in{opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none}}
+</style>
+
+<style>
+/* download page only */
+.platforms{display:grid;gap:var(--s3);margin-top:var(--s4)}
+@media (min-width:44rem){.platforms{grid-template-columns:1fr 1fr}}
+.plat{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--s4);display:flex;flex-direction:column;gap:.9rem;
+}
+.plat--ready{border-color:var(--line-2)}
+.plat--soon{opacity:.72}
+.plat__top{display:flex;align-items:center;gap:.8rem}
+.plat__top svg{color:var(--gold);flex:none}
+.plat h3{font-family:var(--geez);font-weight:400;font-size:1.2rem;margin:0;line-height:1.6}
+.plat h3[lang="en"]{font-family:var(--ui);font-weight:700}
+.plat p{margin:0;color:var(--tx-2);font-size:.95rem}
+.plat .btn{align-self:flex-start}
+.plat__note{
+  font-size:.86rem;color:var(--tx-3);border-top:1px solid var(--line);
+  padding-top:.8rem;margin-top:auto;
+}
+
+.vtable{width:100%;border-collapse:collapse;margin-top:var(--s4);font-size:.95rem}
+.vtable th,.vtable td{text-align:left;padding:.8rem .6rem;border-bottom:1px solid var(--line)}
+.vtable thead th{
+  font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:600;border-bottom-color:var(--line-2);
+}
+.vtable th[scope="row"]{font-weight:600;white-space:nowrap}
+.vtable .num,.vtable .date{color:var(--tx-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vtable .get a{color:var(--gold);text-decoration:none;white-space:nowrap}
+.vtable .get a:hover{text-decoration:underline}
+.tag{
+  display:inline-block;margin-left:.5rem;font-size:.66rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--gold);
+  border:1px solid var(--line-2);border-radius:99px;padding:.12rem .5rem;
+  vertical-align:middle;font-family:var(--ui);
+}
+.tablewrap{overflow-x:auto}
+@media (max-width:34rem){.vtable .date{display:none}.vtable thead th:nth-child(3){display:none}}
+</style>
+
+</head>
+<body>
+
+<header class="hdr">
+  <div class="shell hdr__in">
+    <a class="brand" href="#top">
+      <span class="brand__am" lang="am" data-keep>ብርሃን</span>
+      <span class="brand__en" data-keep>Birhan</span>
+    </a>
+    <nav>
+      <a href="#features"><span lang="am">ስለ መተግበሪያው</span><span lang="en">About</span></a>
+      <a href="#install"><span lang="am">አጫጫን</span><span lang="en">Install</span></a>
+      <a href="#credits"><span lang="am">ምንጮች</span><span lang="en">Sources</span></a>
+      <a href="#privacy"><span lang="am">ግላዊነት</span><span lang="en">Privacy</span></a>
+    </nav>
+    <div class="langsw" role="group" aria-label="Language">
+      <button type="button" id="lang-am" aria-pressed="true" lang="am" data-keep>አማርኛ</button>
+      <button type="button" id="lang-en" aria-pressed="false" data-keep>English</button>
+    </div>
+    <a class="btn btn--sm" href="/download.html">
+      <span lang="am">አውርድ</span><span lang="en">Download</span>
+    </a>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero" style="padding-bottom:0">
+    <div class="shell">
+      <p class="eyebrow"><span lang="am">ማውረጃ</span><span lang="en">Downloads</span></p>
+      <h1 lang="am">ብርሃንን ያውርዱ</h1>
+      <h1 lang="en">Download Birhan</h1>
+      <p class="hero__sub" lang="am">
+        ስልክዎን ይምረጡ። አዲሱን ስሪት ወይም ከዚህ በፊት የነበሩትን ማውረድ ይችላሉ።
+      </p>
+      <p class="hero__sub" lang="en">
+        Pick your phone. You can take the current release, or any earlier one.
+      </p>
+    </div>
+  </div>
+
+  <section style="border-top:0;padding-top:var(--s4)">
+    <div class="shell">
+      <div class="platforms">
+
+        <article class="plat plat--ready">
+          <div class="plat__top">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+              <rect x="6" y="2.5" width="12" height="19" rx="2.4"/><path d="M10.6 18.7h2.8"/>
+            </svg>
+            <div>
+              <h3 lang="am">አንድሮይድ</h3>
+              <h3 lang="en">Android</h3>
+            </div>
+          </div>
+          <p lang="am">አንድሮይድ 7 እና ከዚያ በላይ። ብርሃን በ Play Store ላይ የለም፤ ፋይሉን ከዚህ ያውርዱ።</p>
+          <p lang="en">Android 7 and above. Birhan is not on the Play Store, so the file comes from here.</p>
+          <a class="btn btn--lg" href="/downloads/birhan.apk" id="dl-btn">
+            <span lang="am">አዲሱን ስሪት አውርድ</span><span lang="en">Download the current version</span>
+          </a>
+          <p class="hero__meta" id="dl-meta"><span lang="en">Checking the latest version…</span></p>
+          <p class="hero__sha" id="dl-sha" hidden></p>
+        </article>
+
+        <article class="plat plat--soon">
+          <div class="plat__top">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+              <rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M10.4 5.4h3.2"/>
+            </svg>
+            <div>
+              <h3 lang="am">አይፎን</h3>
+              <h3 lang="en">iPhone</h3>
+            </div>
+          </div>
+          <p lang="am">ለአይፎን ገና አልተሠራም። ሲዘጋጅ በዚሁ ገጽ ላይ ይለጠፋል።</p>
+          <p lang="en">Not built for iPhone yet. When it is ready, it will appear on this page.</p>
+          <p class="plat__note" lang="am">
+            እስከዚያው ድረስ ማንኛውም አንድሮይድ ስልክ ላይ ይሠራል። ቀኑን አናውቅም፤ ስላላወቅን ቀጠሮ አንሰጥም።
+          </p>
+          <p class="plat__note" lang="en">
+            Until then it runs on any Android phone. We don't know the date, and we
+            would rather not promise one we cannot keep.
+          </p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="shell">
+      <div class="sec-head">
+        <p class="kicker"><span lang="am">ቀደም ያሉ ስሪቶች</span><span lang="en">Earlier versions</span></p>
+        <h2 lang="am">የቀድሞ ስሪቶች</h2>
+        <h2 lang="en">Previous versions</h2>
+        <p lang="am">
+          አዲሱ ስሪት ችግር ካመጣብዎ ወደ ቀድሞው መመለስ ይችላሉ። ከመመለስዎ በፊት አዲሱን ማራገፍ አለብዎት።
+        </p>
+        <p lang="en">
+          If a new version gives you trouble, you can go back to an earlier one.
+          Uninstall the newer build first, or Android will refuse to install.
+        </p>
+      </div>
+
+      <div class="tablewrap">
+        <table class="vtable">
+          <thead>
+            <tr>
+              <th scope="col"><span lang="am">ስሪት</span><span lang="en">Version</span></th>
+              <th scope="col"><span lang="am">መጠን</span><span lang="en">Size</span></th>
+              <th scope="col"><span lang="am">ቀን</span><span lang="en">Date</span></th>
+              <th scope="col"><span class="visually-hidden" lang="en">Download</span></th>
+            </tr>
+          </thead>
+          <tbody>
+        <tr>
+          <th scope="row">1.0.9 <span class="tag" lang="am">አሁን ያለው</span><span class="tag" lang="en">Current</span></th>
+          <td class="num">142 MB</td>
+          <td class="date">2026-09-03</td>
+          <td class="get"><a href="/downloads/birhan-1.0.9.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.8 </th>
+          <td class="num">142 MB</td>
+          <td class="date">2026-09-03</td>
+          <td class="get"><a href="/downloads/birhan-1.0.8.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.7 </th>
+          <td class="num">149 MB</td>
+          <td class="date">2026-08-28</td>
+          <td class="get"><a href="/downloads/birhan-1.0.7.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.6 </th>
+          <td class="num">149 MB</td>
+          <td class="date">2026-08-28</td>
+          <td class="get"><a href="/downloads/birhan-1.0.6.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.5 </th>
+          <td class="num">149 MB</td>
+          <td class="date">2026-08-27</td>
+          <td class="get"><a href="/downloads/birhan-1.0.5.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.4 </th>
+          <td class="num">149 MB</td>
+          <td class="date">2026-08-26</td>
+          <td class="get"><a href="/downloads/birhan-1.0.4.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.3 </th>
+          <td class="num">90 MB</td>
+          <td class="date">2026-08-23</td>
+          <td class="get"><a href="/downloads/birhan-1.0.3.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.2 </th>
+          <td class="num">90 MB</td>
+          <td class="date">2026-08-23</td>
+          <td class="get"><a href="/downloads/birhan-1.0.2.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0.1 </th>
+          <td class="num">51 MB</td>
+          <td class="date">2026-08-15</td>
+          <td class="get"><a href="/downloads/birhan-1.0.1.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+        <tr>
+          <th scope="row">1.0 </th>
+          <td class="num">65 MB</td>
+          <td class="date">2026-08-15</td>
+          <td class="get"><a href="/downloads/birhan-1.0.apk">
+            <span lang="am">አውርድ</span><span lang="en">Download</span></a></td>
+        </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <h3 lang="am">ፋይሉ ትክክል መሆኑን ማረጋገጥ</h3>
+        <h3 lang="en">Checking the file is genuine</h3>
+        <p lang="am">
+          እያንዳንዱ ስሪት የራሱ SHA-256 ፊርማ አለው። ካወረዱ በኋላ ማረጋገጥ ከፈለጉ የአዲሱ ፊርማ ከላይ
+          ከማውረጃው ቁልፍ ሥር ተጽፏል።
+        </p>
+        <p lang="en">
+          Every build has its own SHA-256 fingerprint. The one for the current
+          release is printed under the download button above, so you can check what
+          you received matches what we published.
+        </p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="shell">
+    <p lang="am"><a href="/">ወደ መነሻ ገጽ ተመለስ</a></p>
+    <p lang="en"><a href="/">Back to the home page</a></p>
+  </div>
+</footer>
+
+<script>
+/* Language. The page holds both languages and shows one, so a reader is not
+   made to skip past a translation of every line. Amharic is the default
+   because that is who the app is for; the choice is remembered. */
+(function () {
+  var root = document.documentElement;
+  var btnAm = document.getElementById('lang-am');
+  var btnEn = document.getElementById('lang-en');
+
+  function apply(lang) {
+    root.setAttribute('data-lang', lang);
+    root.setAttribute('lang', lang);
+    if (btnAm) btnAm.setAttribute('aria-pressed', String(lang === 'am'));
+    if (btnEn) btnEn.setAttribute('aria-pressed', String(lang === 'en'));
+    try { localStorage.setItem('birhan-lang', lang); } catch (e) {}
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem('birhan-lang'); } catch (e) {}
+  apply(saved === 'en' || saved === 'am' ? saved : 'am');
+
+  if (btnAm) btnAm.addEventListener('click', function () { apply('am'); });
+  if (btnEn) btnEn.addEventListener('click', function () { apply('en'); });
+})();
+
+
+/* Version, size and hash for the current release come from the update
+   manifest, so this page cannot drift from what is actually published. */
+(function () {
+  var SOURCES = ['/latest.json', 'https://updates.birhan.online/birhan/latest.json'];
+  var meta = document.getElementById('dl-meta');
+  var sha  = document.getElementById('dl-sha');
+  var btn  = document.getElementById('dl-btn');
+
+  function safeApkUrl(u) {
+    try {
+      var url = new URL(u, window.location.href);
+      if (url.protocol !== 'https:') return null;
+      if (url.hostname !== 'birhan.online' && url.hostname !== 'www.birhan.online') return null;
+      return url.href;
+    } catch (e) { return null; }
+  }
+
+  function render(m) {
+    var bits = [];
+    if (m.versionName) bits.push('v' + m.versionName);
+    if (m.sizeBytes) bits.push((m.sizeBytes / 1048576).toFixed(0) + ' MB');
+    if (!bits.length) return false;
+    var href = m.apkUrl && safeApkUrl(m.apkUrl);
+    if (href && btn) btn.setAttribute('href', href);
+    meta.innerHTML = '<span lang="am">መጠን</span><span lang="en">Size</span> <b>' + bits.join('  ') + '</b>';
+    if (m.sha256 && sha) { sha.textContent = 'SHA-256 ' + m.sha256; sha.hidden = false; }
+    return true;
+  }
+
+  function tryNext(i) {
+    if (i >= SOURCES.length) {
+      meta.innerHTML = '<span lang="am">ስሪቱን ማወቅ አልተቻለም። ማውረዱ ግን ይሠራል።</span>' +
+                       '<span lang="en">Could not check the version — the download still works.</span>';
+      return;
+    }
+    fetch(SOURCES[i], { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (m) { if (!render(m)) return Promise.reject(); })
+      .catch(function () { tryNext(i + 1); });
+  }
+  tryNext(0);
+})();
+</script>
+</body>
+</html>

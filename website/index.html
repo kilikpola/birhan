@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="am">
+<html lang="am" data-lang="am">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -90,6 +90,20 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 [lang="am"]{font-family:var(--geez);line-height:1.9}
+
+/* One language at a time. Mixing both on every line made the page twice as
+   long and half as readable — a reader only ever needs one of them. The
+   wordmark is marked data-keep because ብርሃን is the name, not a translation. */
+html[data-lang="am"] [lang="en"]:not([data-keep]){display:none}
+html[data-lang="en"] [lang="am"]:not([data-keep]){display:none}
+
+.langsw{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.langsw button{
+  appearance:none;border:0;background:transparent;color:var(--tx-2);
+  font:inherit;font-size:.82rem;padding:.4rem .7rem;cursor:pointer;line-height:1.4;
+}
+.langsw button[aria-pressed="true"]{background:var(--gold);color:var(--gold-ink);font-weight:600}
+.langsw button:not([aria-pressed="true"]):hover{color:var(--tx)}
 /* Ge'ez prose wants 1.9, but display type at 3rem+ does not — and
    [lang="am"] outranks a bare h1, so the override has to match it. */
 h1[lang="am"]{line-height:1.24}
@@ -256,7 +270,7 @@ h2 .en{display:block;font-family:var(--ui);font-weight:700;font-size:.5em;color:
 .credit{padding:var(--s3);border-top:1px solid var(--line)}
 .credit:first-child{border-top:0}
 .credit .name{font-size:.98rem;font-weight:600}
-.credit .lic{font-size:.83rem;color:var(--tx-3);margin-top:.25rem}
+.credit .lic{font-size:.83rem;color:var(--tx-3);margin-top:.3rem;display:flex;flex-wrap:wrap;gap:.9rem;align-items:baseline}
 .credit a{color:var(--gold);text-decoration:none;border-bottom:1px solid transparent}
 .credit a:hover{border-color:var(--gold)}
 
@@ -283,16 +297,22 @@ footer a{color:var(--gold);text-decoration:none}
 <header class="hdr">
   <div class="shell hdr__in">
     <a class="brand" href="#top">
-      <span class="brand__am" lang="am">ብርሃን</span>
-      <span class="brand__en">Birhan</span>
+      <span class="brand__am" lang="am" data-keep>ብርሃን</span>
+      <span class="brand__en" data-keep>Birhan</span>
     </a>
     <nav>
-      <a href="#features">About</a>
-      <a href="#install">Install</a>
-      <a href="#credits">Credits</a>
-      <a href="#privacy">Privacy</a>
+      <a href="#features"><span lang="am">ስለ መተግበሪያው</span><span lang="en">About</span></a>
+      <a href="#install"><span lang="am">አጫጫን</span><span lang="en">Install</span></a>
+      <a href="#credits"><span lang="am">ምንጮች</span><span lang="en">Sources</span></a>
+      <a href="#privacy"><span lang="am">ግላዊነት</span><span lang="en">Privacy</span></a>
     </nav>
-    <a class="btn btn--sm" href="#download"><span lang="am">አውርድ</span></a>
+    <div class="langsw" role="group" aria-label="Language">
+      <button type="button" id="lang-am" aria-pressed="true" lang="am" data-keep>አማርኛ</button>
+      <button type="button" id="lang-en" aria-pressed="false" data-keep>English</button>
+    </div>
+    <a class="btn btn--sm" href="/download.html">
+      <span lang="am">አውርድ</span><span lang="en">Download</span>
+    </a>
   </div>
 </header>
 
@@ -302,23 +322,28 @@ footer a{color:var(--gold);text-decoration:none}
   <div class="hero">
     <div class="shell hero__grid">
       <div>
-        <p class="eyebrow">Android · <span lang="am">ነፃ</span> · Free</p>
+        <p class="eyebrow"><span lang="am">ለአንድሮይድ፣ ነፃ</span><span lang="en">Android, free</span></p>
 
-        <h1 lang="am">መጽሐፍ ቅዱስ ያለ ኢንተርኔት።
-          <span class="en" lang="en">The Bible, with the radio off.</span>
-        </h1>
+        <h1 lang="am">መጽሐፍ ቅዱስዎ ሁልጊዜ አብሮዎት ነው።</h1>
+        <h1 lang="en">Your Bible, always with you.</h1>
 
+        <p class="hero__sub" lang="am">
+          ሙሉ መጽሐፍ ቅዱስ በአማርኛና በእንግሊዝኛ በስልክዎ ውስጥ ተቀምጧል። ኢንተርኔት ባይኖርም ያነቡታል።
+          ከቤተ ክርስቲያንዎ የሚላኩ ማስታወቂያዎችና ሰነዶችም እዚሁ ይደርስዎታል።
+        </p>
         <p class="hero__sub" lang="en">
-          The whole Bible in Amharic and English, stored on your phone — plus the
-          announcements and documents from your own church. Made for Ethiopian
-          churches, and for phones that cost less than a month of data.
+          The whole Bible in Amharic and English, kept on your phone. You can read
+          it with no internet at all. The announcements and documents from your
+          church arrive here too.
         </p>
 
         <div class="hero__cta">
           <a class="btn btn--lg" href="/downloads/birhan.apk" id="dl-btn">
-            <span lang="am">ብርሃንን አውርድ</span>
+            <span lang="am">ብርሃንን አውርድ</span><span lang="en">Download Birhan</span>
           </a>
-          <a class="btn btn--lg btn--ghost" href="#features"><span lang="en">See what it does</span></a>
+          <a class="btn btn--lg btn--ghost" href="/download.html">
+            <span lang="am">ሌሎች ስሪቶች</span><span lang="en">Other versions</span>
+          </a>
         </div>
 
         <p class="hero__meta" id="dl-meta">
@@ -327,9 +352,9 @@ footer a{color:var(--gold);text-decoration:none}
         <p class="hero__sha" id="dl-sha" hidden></p>
 
         <ul class="chips">
-          <li><span lang="am">ማስታወቂያ የለም</span> · No ads</li>
-          <li><span lang="am">ክትትል የለም</span> · No trackers</li>
-          <li><span lang="am">ያለ ኢንተርኔት</span> · Works offline</li>
+          <li><span lang="am">ማስታወቂያ የለበትም</span><span lang="en">No ads</span></li>
+          <li><span lang="am">ማንም አይከታተልዎትም</span><span lang="en">Nothing tracks you</span></li>
+          <li><span lang="am">ያለ ኢንተርኔት ይሠራል</span><span lang="en">Works offline</span></li>
         </ul>
       </div>
 
@@ -346,9 +371,11 @@ footer a{color:var(--gold);text-decoration:none}
   <section id="features">
     <div class="shell">
       <div class="sec-head reveal">
-        <p class="kicker">What it does</p>
-        <h2 lang="am">ሦስት ነገሮች፣ በደንብ የተሠሩ<span class="en" lang="en">Three things, done properly</span></h2>
-        <p lang="en">No feature list for its own sake — this is what people open it for.</p>
+        <p class="kicker"><span lang="am">ምን ያደርጋል</span><span lang="en">What it does</span></p>
+        <h2 lang="am">ሦስት ነገሮች፣ በደንብ ተሠርተው</h2>
+        <h2 lang="en">Three things, done properly</h2>
+        <p lang="am">ረጅም ዝርዝር የለም። ሰዎች መተግበሪያውን የሚከፍቱት ለእነዚህ ነው።</p>
+        <p lang="en">No list for the sake of a list. These are the things people open it for.</p>
       </div>
 
       <div class="cards">
@@ -357,7 +384,9 @@ footer a{color:var(--gold);text-decoration:none}
             <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H11v18H5.5A2.5 2.5 0 0 1 3 18.5Z"/>
             <path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H13v18h5.5a2.5 2.5 0 0 0 2.5-2.5Z"/>
           </svg>
-          <h3 lang="am">ሙሉ መጽሐፍ ቅዱስ<span class="en" lang="en"></span></h3>
+          <h3 lang="am">ሙሉው መጽሐፍ ቅዱስ</h3>
+          <h3 lang="en">The whole Bible</h3>
+          <p lang="am">በአማርኛና በእንግሊዝኛ፣ ሁሉም መጻሕፍት፣ ከመተግበሪያው ጋር አብረው ይመጣሉ። አንዱን ብቻ ወይም ሁለቱን ጎን ለጎን ማንበብ ይችላሉ።</p>
           <p lang="en">Amharic and English, every book, already inside the app. Read one, or both side by side.</p>
         </article>
 
@@ -366,8 +395,10 @@ footer a{color:var(--gold);text-decoration:none}
             <path d="M4 7h16M4 12h16M4 17h9"/>
             <circle cx="19" cy="17" r="2.4"/>
           </svg>
-          <h3 lang="am">የቤተ ክርስቲያንዎ መረጃ</h3>
-          <p lang="en">Announcements and documents from your own church — and only yours. Other churches never see it.</p>
+          <h3 lang="am">የቤተ ክርስቲያንዎ ወሬ</h3>
+          <h3 lang="en">News from your church</h3>
+          <p lang="am">ማስታወቂያዎችና ሰነዶች የሚደርስዎት ከራስዎ ቤተ ክርስቲያን ብቻ ነው። ሌላ ቤተ ክርስቲያን የእናንተን አያይም።</p>
+          <p lang="en">Announcements and documents from your own church, and only yours. No other church sees them.</p>
         </article>
 
         <article class="card reveal">
@@ -375,8 +406,10 @@ footer a{color:var(--gold);text-decoration:none}
             <path d="M12 3v18M4 8h16M7 5.4h10M7 10.6h10M9.5 15h5"/>
             <circle cx="12" cy="8" r="2.5"/>
           </svg>
-          <h3 lang="am">የጥናት መሣሪያዎች</h3>
-          <p lang="en">Tap a verse for commentary, cross-references and word study. All of it stored locally.</p>
+          <h3 lang="am">ለጥልቅ ጥናት</h3>
+          <h3 lang="en">For deeper study</h3>
+          <p lang="am">አንድ ቁጥር ሲነኩ ማብራሪያ፣ ተዛማጅ ጥቅሶችና የቃል ፍቺ ይከፈታል። ሁሉም በስልክዎ ውስጥ ስለሆነ ኢንተርኔት አይፈልግም።</p>
+          <p lang="en">Tap a verse and the commentary, cross-references and word meanings open. All of it lives on the phone, so none of it needs a connection.</p>
         </article>
       </div>
 
@@ -387,15 +420,23 @@ footer a{color:var(--gold);text-decoration:none}
                alt="ኦሪት ዘፍጥረት ምዕራፍ ፩ በአማርኛ። Genesis chapter 1 in Amharic."></div>
         </div>
         <div class="row__body">
-          <h3 lang="am">መረቡ ሲጠፋ ይሠራል<span class="en" lang="en">It works when the signal doesn't</span></h3>
-          <p lang="en">
-            The scripture is not streamed. It ships inside the app and lives on the
-            phone, so reading works in a basement, on a bus, or with the data
-            switched off entirely — and costs nothing after the first download.
+          <h3 lang="am">መረቡ ሲጠፋም ይሠራል</h3>
+          <h3 lang="en">It works when the signal doesn't</h3>
+          <p lang="am">
+            ጽሑፉ ከበይነመረብ አይመጣም። ከመተግበሪያው ጋር ወርዶ በስልክዎ ውስጥ ይቀመጣል። ስለዚህ በምድር ቤት፣
+            በአውቶቡስ ውስጥ፣ ወይም ዳታውን ጨርሶ አጥፍተውም ማንበብ ይችላሉ።
+          </p>
+          <p lang="am">
+            አንዴ ካወረዱ በኋላ ንባቡ ምንም አያስከፍልዎትም። ኢንተርኔት የሚፈልግ መጽሐፍ ቅዱስ ሁልጊዜ አለ ማለት አይደለም።
           </p>
           <p lang="en">
-            That is the whole point. A Bible that needs a connection is not a Bible
-            you can rely on.
+            The scripture is not streamed. It comes down with the app and stays on
+            the phone, so reading works in a basement, on a bus, or with the data
+            switched off entirely.
+          </p>
+          <p lang="en">
+            After the first download, reading costs you nothing. A Bible that needs
+            a connection is not one you can count on.
           </p>
         </div>
       </div>
@@ -406,15 +447,23 @@ footer a{color:var(--gold);text-decoration:none}
                alt="የቅንብሮች ገጽ — ማከማቻና ውርዶች። The Settings screen showing storage and downloads."></div>
         </div>
         <div class="row__body">
-          <h3 lang="am">ዳታዎን ያከብራል<span class="en" lang="en">It respects what data costs</span></h3>
-          <p lang="en">
-            Birhan tells you the size in megabytes before any download starts, and
-            stays on Wi-Fi unless you say otherwise. Settings shows exactly what it
-            is using on your phone, and lets you clear what you don't need without
-            touching the Bible itself.
+          <h3 lang="am">ዳታዎን አያባክንም</h3>
+          <h3 lang="en">It doesn't waste your data</h3>
+          <p lang="am">
+            ማንኛውም ነገር ከመውረዱ በፊት ስንት ሜጋባይት እንደሚወስድ ይነግርዎታል። እርስዎ እስካልፈቀዱ ድረስ
+            በWiFi ብቻ ያወርዳል።
+          </p>
+          <p lang="am">
+            በስልክዎ ላይ ምን ያህል ቦታ እንደያዘ በቅንብሮች ውስጥ ያያሉ፤ የማይፈልጉትንም መጽሐፍ ቅዱስዎን
+            ሳይነኩ ማጽዳት ይችላሉ።
           </p>
           <p lang="en">
-            Free, with no advertising and nothing tracking you.
+            Birhan tells you the size in megabytes before anything downloads, and
+            stays on Wi-Fi unless you say otherwise.
+          </p>
+          <p lang="en">
+            Settings shows how much room it is taking on your phone, and lets you
+            clear what you don't need without touching the Bible itself.
           </p>
         </div>
       </div>
@@ -425,29 +474,36 @@ footer a{color:var(--gold);text-decoration:none}
   <section id="download">
     <div class="shell">
       <div class="sec-head reveal">
-        <p class="kicker">Get it</p>
-        <h2 lang="am">መተግበሪያውን ያውርዱ<span class="en" lang="en">Download the app</span></h2>
+        <p class="kicker"><span lang="am">ያውርዱት</span><span lang="en">Get it</span></p>
+        <h2 lang="am">መተግበሪያውን ያውርዱ</h2>
+        <h2 lang="en">Download the app</h2>
       </div>
 
       <div class="dl-panel reveal">
         <a class="btn btn--lg" href="/downloads/birhan.apk" id="dl-btn-2">
-          <span lang="am">ብርሃንን አውርድ</span>
+          <span lang="am">ብርሃንን አውርድ</span><span lang="en">Download Birhan</span>
         </a>
         <p class="hero__meta" id="dl-meta-2"><span lang="en">Checking the latest version…</span></p>
       </div>
 
       <div class="note reveal">
-        <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ<span class="en" lang="en"></span></h3>
+        <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ</h3>
+        <h3 lang="en">If you installed an earlier test build</h3>
         <p lang="am">
-          አንድሮይድ በተለያየ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ከዚህ በፊት የሙከራ (debug) ስሪት ጭነው
-          ከነበረ፣ አዲሱን ከመጫንዎ በፊት አሮጌውን <b>ማራገፍ (uninstall)</b> አለብዎት። አለበለዚያ
-          “App not installed” የሚል መልእክት ይመጣል።
+          አንድሮይድ በሌላ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ስለዚህ አዲሱን ከመጫንዎ በፊት አሮጌውን
+          <b>ማራገፍ</b> ያስፈልግዎታል፤ አለበለዚያ “App not installed” የሚል ይላል።
         </p>
-        <p class="en" lang="en">
-          Android refuses to update an app signed with a different key. If you have
-          an older debug-signed build, you must <b>uninstall it first</b> — otherwise
-          the install fails with “App not installed”. Your Bible reading works
-          offline either way; only your sign-in is lost, and you can sign back in.
+        <p lang="am">
+          መጽሐፍ ቅዱስዎ ለማንኛውም ያለ ኢንተርኔት ይሠራል። የሚጠፋው መግቢያዎ ብቻ ነው፤ እንደገና መግባት ይችላሉ።
+        </p>
+        <p lang="en">
+          Android will not update an app signed with a different key, so you need to
+          <b>uninstall the old one first</b>. Otherwise the install stops with
+          “App not installed”.
+        </p>
+        <p lang="en">
+          Your Bible reading works offline either way. All you lose is your sign-in,
+          and you can sign back in.
         </p>
       </div>
     </div>
@@ -457,23 +513,25 @@ footer a{color:var(--gold);text-decoration:none}
   <section id="install">
     <div class="shell">
       <div class="sec-head reveal">
-        <p class="kicker">Three steps</p>
-        <h2 lang="am">እንዴት እንደሚጭኑ<span class="en" lang="en">How to install</span></h2>
-        <p lang="en">Birhan is not on the Play Store, so Android asks once for permission.</p>
+        <p class="kicker"><span lang="am">ሦስት ደረጃ</span><span lang="en">Three steps</span></p>
+        <h2 lang="am">እንዴት እንደሚጭኑት</h2>
+        <h2 lang="en">How to install it</h2>
+        <p lang="am">ብርሃን በ Play Store ላይ ስለሌለ አንድሮይድ አንድ ጊዜ ፈቃድ ይጠይቅዎታል።</p>
+        <p lang="en">Birhan is not on the Play Store, so Android asks your permission once.</p>
       </div>
 
       <ol class="steps reveal">
         <li>
-          <p lang="am">ከላይ ያለውን የማውረጃ ቁልፍ ይጫኑ፣ ማውረዱ ሲጨርስ ፋይሉን ይክፈቱ።</p>
-          <p class="en" lang="en">Tap download, then open the file when it finishes.</p>
+          <p lang="am">የማውረጃ ቁልፉን ይጫኑ። ሲጨርስ ፋይሉን ይክፈቱት።</p>
+          <p lang="en">Tap download. When it finishes, open the file.</p>
         </li>
         <li>
-          <p lang="am">አንድሮይድ ሲጠይቅ <b>“ከማይታወቁ ምንጮች መጫን ፍቀድ”</b> የሚለውን ያብሩ።</p>
-          <p class="en" lang="en">Allow “install from unknown sources” when Android asks.</p>
+          <p lang="am">አንድሮይድ ሲጠይቅዎት <b>“ከማይታወቁ ምንጮች መጫን ፍቀድ”</b> የሚለውን ያብሩ።</p>
+          <p lang="en">When Android asks, allow “install from unknown sources”.</p>
         </li>
         <li>
-          <p lang="am"><b>ጫን (Install)</b> የሚለውን ይጫኑ።</p>
-          <p class="en" lang="en">Tap Install. That's it.</p>
+          <p lang="am"><b>ጫን</b> የሚለውን ይንኩ። ያ ብቻ ነው።</p>
+          <p lang="en">Tap Install. That's all.</p>
         </li>
       </ol>
     </div>
@@ -483,38 +541,55 @@ footer a{color:var(--gold);text-decoration:none}
   <section id="credits">
     <div class="shell">
       <div class="sec-head reveal">
-        <p class="kicker">Sources</p>
-        <h2 lang="am">ምንጮች እና ፈቃዶች<span class="en" lang="en">Sources &amp; licences</span></h2>
+        <p class="kicker"><span lang="am">ምንጮች</span><span lang="en">Sources</span></p>
+        <h2 lang="am">ምንጮችና ፈቃዶች</h2>
+        <h2 lang="en">Sources and licences</h2>
+        <p lang="am">ብርሃን የተሠራው በክፍት ጽሑፎች ላይ ነው። ሥራቸውን የተጠቀምንባቸው እነዚህ ናቸው።</p>
         <p lang="en">Birhan is built on open texts. These are the people whose work it carries.</p>
       </div>
 
       <div class="credits reveal">
         <div class="credit">
           <div class="name">King James Version (1611)</div>
-          <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
-            <a href="https://en.wikipedia.org/wiki/King_James_Version#Copyright_status" rel="noopener">status</a></div>
+          <div class="lic">
+            <span lang="am">የህዝብ ንብረት</span><span lang="en">Public domain</span>
+            <a href="https://en.wikipedia.org/wiki/King_James_Version#Copyright_status" rel="noopener">
+              <span lang="am">ሁኔታ</span><span lang="en">status</span></a>
+          </div>
         </div>
         <div class="credit">
           <div class="name">OpenBible.info Cross References</div>
-          <div class="lic">CC-BY 4.0 ·
-            <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">licence</a> ·
-            <a href="https://www.openbible.info/labs/cross-references/" rel="noopener">source</a></div>
+          <div class="lic">CC-BY 4.0
+            <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">
+              <span lang="am">ፈቃድ</span><span lang="en">licence</span></a>
+            <a href="https://www.openbible.info/labs/cross-references/" rel="noopener">
+              <span lang="am">ምንጭ</span><span lang="en">source</span></a>
+          </div>
         </div>
         <div class="credit">
           <div class="name">Strong's Hebrew &amp; Greek Dictionaries (Open Scriptures)</div>
-          <div class="lic">CC-BY-SA 3.0 ·
-            <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noopener">licence</a> ·
-            <a href="https://github.com/openscriptures/strongs" rel="noopener">source</a></div>
+          <div class="lic">CC-BY-SA 3.0
+            <a href="https://creativecommons.org/licenses/by-sa/3.0/" rel="noopener">
+              <span lang="am">ፈቃድ</span><span lang="en">licence</span></a>
+            <a href="https://github.com/openscriptures/strongs" rel="noopener">
+              <span lang="am">ምንጭ</span><span lang="en">source</span></a>
+          </div>
         </div>
         <div class="credit">
           <div class="name">Matthew Henry's Concise Commentary (CrossWire SWORD)</div>
-          <div class="lic"><span lang="am">የህዝብ ንብረት</span> · Public domain ·
-            <a href="https://crosswire.org/sword/modules/ModInfo.jsp?modName=MHCC" rel="noopener">source</a></div>
+          <div class="lic">
+            <span lang="am">የህዝብ ንብረት</span><span lang="en">Public domain</span>
+            <a href="https://crosswire.org/sword/modules/ModInfo.jsp?modName=MHCC" rel="noopener">
+              <span lang="am">ምንጭ</span><span lang="en">source</span></a>
+          </div>
         </div>
         <div class="credit">
           <div class="name">HistoricalChristianFaith / Commentaries-Database (Church Fathers)</div>
-          <div class="lic"><span lang="am">የህዝብ ንብረት ውክልና</span> · Public domain dedication ·
-            <a href="https://github.com/HistoricalChristianFaith/Commentaries-Database" rel="noopener">source</a></div>
+          <div class="lic">
+            <span lang="am">የህዝብ ንብረት ውክልና</span><span lang="en">Public domain dedication</span>
+            <a href="https://github.com/HistoricalChristianFaith/Commentaries-Database" rel="noopener">
+              <span lang="am">ምንጭ</span><span lang="en">source</span></a>
+          </div>
         </div>
       </div>
     </div>
@@ -524,47 +599,51 @@ footer a{color:var(--gold);text-decoration:none}
   <section id="privacy">
     <div class="shell">
       <div class="sec-head reveal">
-        <p class="kicker">Privacy</p>
-        <h2 lang="am">የግላዊነት መግለጫ<span class="en" lang="en">What we collect, and who sees it</span></h2>
+        <p class="kicker"><span lang="am">ግላዊነት</span><span lang="en">Privacy</span></p>
+        <h2 lang="am">ምን እንሰበስባለን፣ ማንስ ያየዋል</h2>
+        <h2 lang="en">What we collect, and who sees it</h2>
       </div>
 
       <div class="prose reveal">
-        <h3 lang="am">ምን እንሰበስባለን<span class="en" lang="en">What we collect</span></h3>
+        <h3 lang="am">ምን እንሰበስባለን</h3>
+        <h3 lang="en">What we collect</h3>
         <p lang="am">
           ስምዎን፣ የመረጡትን ቤተ ክርስቲያንና ቅርንጫፍ፣ እና በቤተ ክርስቲያኑ ውስጥ ያለዎትን ድርሻ። ኢሜይል ወይም
           ስልክ ቁጥር — ቢያንስ አንዱ ያስፈልጋል። መለያዎን ሲከፍቱ የቴሌግራም መለያዎን እናረጋግጣለን፤ ይህም እርስዎ
           እውነተኛ ሰው መሆንዎን ለማወቅ ነው።
         </p>
-        <p class="en" lang="en">
+        <p lang="en">
           Your name, the church and branch you choose, and your role in that church.
           An email address or a phone number — at least one is required. When you
           register we confirm your Telegram account, to establish that you are a real
           person.
         </p>
 
-        <h3 lang="am">ማን ሊያየው ይችላል<span class="en" lang="en">Who can see it</span></h3>
+        <h3 lang="am">ማን ሊያየው ይችላል</h3>
+        <h3 lang="en">Who can see it</h3>
         <p lang="am">
           የአባልነት መረጃዎ የሚታየው በራስዎ ቤተ ክርስቲያን ውስጥ ብቻ ነው። ሌሎች አብያተ ክርስቲያናት ሊያዩት
           አይችሉም። ብርሃን መረጃዎን አይሸጥም፣ ለማስታወቂያም አይጠቀምበትም። የክትትል መሣሪያ የለም።
         </p>
-        <p class="en" lang="en">
+        <p lang="en">
           Your membership details are visible only within your own church. Other
           churches cannot see them. Birhan does not sell your data or use it for
           advertising, and there are no trackers.
         </p>
-        <p class="en" lang="en">
+        <p lang="en">
           This matters more than usual: this data says which church you belong to,
           and therefore something about your religious affiliation. It is treated
           accordingly.
         </p>
 
-        <h3 lang="am">መለያዎን መሰረዝ<span class="en" lang="en">Deleting your account</span></h3>
+        <h3 lang="am">መለያዎን መሰረዝ</h3>
+        <h3 lang="en">Deleting your account</h3>
         <p lang="am">
           በመተግበሪያው ውስጥ <b>ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
           ከሚያስተዳድራቸው የቤተ ክርስቲያን ቴሌግራም ቡድኖች ይወጣሉ። ያለፉ መልሶችዎ ይቀራሉ፣ ነገር ግን ስምዎ
           ተነስቶ “የተሰረዘ ተጠቃሚ” ተብሎ ይታያል። ይህ የማይቀለበስ ነው።
         </p>
-        <p class="en" lang="en">
+        <p lang="en">
           In the app, go to <b>Settings → Delete my account</b>. Your account is
           deleted and you are removed from the church Telegram groups Birhan manages.
           Past replies stay, with your name taken off them and shown as “Deleted
@@ -578,13 +657,40 @@ footer a{color:var(--gold);text-decoration:none}
 
 <footer>
   <div class="shell">
-    <p lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት።</p>
-    <p lang="en">Questions, or want your church added? <a href="mailto:hello@birhan.online">hello@birhan.online</a></p>
+    <p lang="am">ብርሃን ለኢትዮጵያ አብያተ ክርስቲያናት የተሠራ ነው።</p>
+    <p lang="am">ጥያቄ ካለዎት ወይም ቤተ ክርስቲያንዎ እንዲጨመር ከፈለጉ <a href="mailto:hello@birhan.online">hello@birhan.online</a> ይጻፉልን።</p>
+    <p lang="am">ለጊዜው ለአንድሮይድ ብቻ ነው።</p>
+    <p lang="en">Birhan is made for Ethiopian churches.</p>
+    <p lang="en">Questions, or want your church added? Write to <a href="mailto:hello@birhan.online">hello@birhan.online</a></p>
     <p lang="en">Android only, for now.</p>
   </div>
 </footer>
 
 <script>
+/* Language. The page holds both languages and shows one, so a reader is not
+   made to skip past a translation of every line. Amharic is the default
+   because that is who the app is for; the choice is remembered. */
+(function () {
+  var root = document.documentElement;
+  var btnAm = document.getElementById('lang-am');
+  var btnEn = document.getElementById('lang-en');
+
+  function apply(lang) {
+    root.setAttribute('data-lang', lang);
+    root.setAttribute('lang', lang);
+    if (btnAm) btnAm.setAttribute('aria-pressed', String(lang === 'am'));
+    if (btnEn) btnEn.setAttribute('aria-pressed', String(lang === 'en'));
+    try { localStorage.setItem('birhan-lang', lang); } catch (e) {}
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem('birhan-lang'); } catch (e) {}
+  apply(saved === 'en' || saved === 'am' ? saved : 'am');
+
+  if (btnAm) btnAm.addEventListener('click', function () { apply('am'); });
+  if (btnEn) btnEn.addEventListener('click', function () { apply('en'); });
+})();
+
 /* Version and size come from the update manifest, so this page cannot go
    stale the way a hardcoded "v1.0.4 — 148 MB" would. Both download buttons
    already work without it: their href is a real, unchanging path.
@@ -622,8 +728,8 @@ footer a{color:var(--gold);text-decoration:none}
     // itself applies before it downloads anything.
     metas.forEach(function (el) {
       if (!el) return;
-      el.innerHTML = '<span lang="am">መጠን</span> · <span lang="en">Size</span>: ' +
-                     '<b>' + bits.join(' · ') + '</b>';
+      el.innerHTML = '<span lang="am">መጠን</span><span lang="en">Size</span> ' +
+                     '<b>' + bits.join('  ') + '</b>';
     });
 
     if (m.sha256 && shaEl) { shaEl.textContent = 'SHA-256 ' + m.sha256; shaEl.hidden = false; }
