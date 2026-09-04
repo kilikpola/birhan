@@ -1,12 +1,12 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.7",
-  "apkUrl": "https://birhan.online/downloads/birhan-1.0.7.apk",
-  "sha256": "f909af8ad39e680ef462670ede861b2757f6d9cb5edb647dfa7cbc236990300c",
-  "sizeBytes": 155967163,
-  "releasedAt": "2026-08-28T19:05:37Z",
+  "versionCode": 10,
+  "versionName": "1.0.9",
+  "apkUrl": "https://birhan.online/downloads/birhan-1.0.9.apk",
+  "sha256": "4fe531e67e03fa1686ac696eb6ac4f6ca6b7d65510985d8674caf31d4aca5378",
+  "sizeBytes": 149405095,
+  "releasedAt": "2026-09-03T18:07:58Z",
   "minSupportedVersionCode": 1,
-  "notes_am": "የመጽሐፍ ቅዱስ ንባብ ገጽ ጸዳ ተደረገ፦ የተደገመው የምዕራፍ ርዕስና አላስፈላጊ ምልክቶች ተነሱ። አሁን ጥቅስ ላይ አንዴ ብቻ ነካ ሲያደርጉ ማብራሪያ፣ ተመሳሳይ ጥቅሶች፣ የቃል ጥናት፣ ማድመቂያና ዕልባት በአንድ ቦታ ይመጣሉ — ከዚህ በፊት ተጭነው መያዝ ይጠይቅ ነበር።",
-  "notes_en": "A cleaner Bible reading screen: the duplicated chapter heading and the status chips are gone. Tapping a verse once now opens commentary, cross-references, word study, highlighting and bookmarks together in one sheet — previously the study tools needed a long press.",
+  "notes_am": "የውስጥ ማሻሻያ ብቻ። መተግበሪያው ችግር ሲያጋጥመው ሪፖርት እንዲልክ ተደርጓል፤ ይህም ስህተቶችን ቀድሞ ለማወቅና ለማስተካከል ይረዳል። ምንም የግል መረጃ አይላክም። ሌላ የተቀየረ ነገር የለም።",
+  "notes_en": "Internal change only. The app can now report crashes so problems get found and fixed sooner. No personal information is sent. Nothing else has changed.",
   "mandatory": false
 }

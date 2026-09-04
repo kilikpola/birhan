@@ -1,141 +1,412 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="am">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ብርሃን · Birhan</title>
-<meta name="description" content="ብርሃን — መጽሐፍ ቅዱስ ያለ ኢንተርኔት፣ የቤተ ክርስቲያንዎ ማስታወቂያዎችና ሰነዶች። Birhan — the Bible offline, your church's announcements and documents. Free, no ads." />
-<meta name="theme-color" content="#0B0B0D" />
-<link rel="icon" type="image/png" href="/assets/favicon.png" />
-<link rel="apple-touch-icon" href="/assets/birhanlogo.png" />
+<meta name="description" content="የአማርኛና የእንግሊዝኛ መጽሐፍ ቅዱስ ያለ ኢንተርኔት። Birhan — the Bible offline in Amharic and English, plus your church's announcements and documents. Free, no ads, no trackers.">
+<meta name="theme-color" content="#0B0B0D">
+<link rel="icon" href="/assets/favicon.png">
 
 <style>
-  /* Ethiopic, without making anyone pay for it twice.
-     local() comes first, so a phone that already has an Ethiopic font — every
-     current Android, iOS 15 and later — renders Ge'ez from disk and never
-     downloads anything. Only a machine without one fetches the woff2. */
-  @font-face {
-    font-family: 'Birhan Ethiopic';
-    src: local('Noto Sans Ethiopic'), local('Noto Serif Ethiopic'),
-         local('Abyssinica SIL'), local('Nyala'), local('Kefa'),
-         url('/assets/noto-serif-ethiopic.woff2') format('woff2');
-    unicode-range: U+1200-137F, U+1380-139F, U+2D80-2DDF;
-    font-display: swap;
+/* ------------------------------------------------------------------
+   Birhan — birhan.online
+
+   No third-party hosts. The Ge'ez face is tried from the reader's own
+   system first and only then fetched from this origin, so a phone that
+   already has an Ethiopic font downloads nothing. There are no trackers
+   and no analytics; the privacy section below says so, and the page has
+   to be able to keep that promise.
+
+   Palette and type come from the app's own tokens (src/theme/tokens.ts):
+   gold leaf on near-black, with lapis for links — the colours of an
+   illuminated manuscript, which is where the app's look came from.
+   ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: 'Birhan Ethiopic';
+  src: local('Noto Serif Ethiopic'), local('Noto Sans Ethiopic'),
+       local('Abyssinica SIL'), local('Nyala'), local('Kefa'),
+       url('/assets/noto-serif-ethiopic.woff2') format('woff2');
+  unicode-range: U+1200-137F, U+1380-139F, U+2D80-2DDF;
+  font-display: swap;
+}
+
+/* Dark-first: the app is a night-reading app, and this is its ground.
+   Light is the override, not the default. */
+:root {
+  --ground:    #0B0B0D;
+  --surface:   #141417;
+  --raised:    #1C1C21;
+  --rule:      #26262C;
+  --rule-lit:  #35353D;
+  --ink:       #F2EFE9;
+  --ink-soft:  #9B968D;
+  --ink-faint: #63605A;
+  --gold:      #E3A93C;
+  --gold-dim:  #8A671F;
+  --gold-glow: rgba(227,169,60,.12);
+  --lapis:     #5B8BD0;
+
+  --geez: 'Birhan Ethiopic', 'Noto Serif Ethiopic', serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --measure: 34rem;
+  --step: clamp(1rem, .8rem + .6vw, 1.15rem);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ground:    #FAF8F4;
+    --surface:   #FFFFFF;
+    --raised:    #F1EDE5;
+    --rule:      #E2DDD2;
+    --rule-lit:  #CFC7B8;
+    --ink:       #17161A;
+    --ink-soft:  #5B564E;
+    --ink-faint: #8D877D;
+    --gold:      #A8761C;
+    --gold-dim:  #D6BE8A;
+    --gold-glow: rgba(168,118,28,.10);
+    --lapis:     #2F5FA6;
   }
+}
+:root[data-theme="light"] {
+  --ground:    #FAF8F4;
+  --surface:   #FFFFFF;
+  --raised:    #F1EDE5;
+  --rule:      #E2DDD2;
+  --rule-lit:  #CFC7B8;
+  --ink:       #17161A;
+  --ink-soft:  #5B564E;
+  --ink-faint: #8D877D;
+  --gold:      #A8761C;
+  --gold-dim:  #D6BE8A;
+  --gold-glow: rgba(168,118,28,.10);
+  --lapis:     #2F5FA6;
+}
 
-  :root {
-    /* Straight from the app's own tokens (src/theme/tokens.ts, dark). */
-    --bg:        #0B0B0D;
-    --surface:   #141417;
-    --border:    #26262C;
-    --text:      #F2EFE9;
-    --text-soft: #9B968D;
-    --text-faint:#63605A;
-    --gold:      #E3A93C;
-    --gold-glow: rgba(227,169,60,0.12);
-    --danger:    #D2564B;
-    --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
-  }
+*, *::before, *::after { box-sizing: border-box; }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font: 16px/1.6 var(--sans);
-    -webkit-text-size-adjust: 100%;
-  }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--step);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
 
-  /* Ge'ez is tall and dense: it needs roughly 1.9x leading, not the Latin 1.6.
-     Every Amharic block carries lang="am" and gets it. */
-  [lang="am"] {
-    font-family: 'Birhan Ethiopic', var(--sans);
-    line-height: 1.9;
-  }
-  [lang="en"] { line-height: 1.6; }
+/* Ge'ez needs a taller line box than Latin — roughly 1.9. Every Amharic
+   block on this page inherits it, so the two scripts never collide when
+   they sit one under the other. */
+[lang="am"] { font-family: var(--geez); line-height: 1.9; }
 
-  .wrap { max-width: 44rem; margin: 0 auto; padding: 0 1.25rem; }
+.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
 
-  header { padding: 2.5rem 0 1.5rem; text-align: center; }
-  header img { width: 72px; height: 72px; border-radius: 16px; }
-  header h1 { font-size: 1.9rem; margin-top: .75rem; letter-spacing: -0.01em; }
-  header .latin { color: var(--text-soft); font-size: .95rem; letter-spacing: .28em; }
+/* The reading measure lives on the blocks, not the page, so prose stays at a
+   comfortable line length while the screenshot bands are allowed the extra
+   width they need to sit beside their text instead of being squeezed. */
+.hero, section, footer { max-width: var(--measure); margin-inline: auto; }
+#about { --measure: 48rem; }
 
-  nav { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1.25rem; }
-  nav a {
-    color: var(--text-soft); text-decoration: none; font-size: .82rem;
-    border: 1px solid var(--border); border-radius: 999px; padding: .35rem .8rem;
-  }
-  nav a:hover, nav a:focus-visible { color: var(--gold); border-color: var(--gold); }
+a { color: var(--lapis); }
+a:focus-visible, .btn:focus-visible, .jump a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
 
-  section { padding: 2.25rem 0; border-top: 1px solid var(--border); }
-  section:first-of-type { border-top: 0; }
+/* ---------- hero: a manuscript incipit ---------- */
+.hero { padding: 4.5rem 0 2.5rem; }
 
-  h2 { font-size: 1.15rem; margin-bottom: .35rem; }
-  h3 { font-size: .95rem; margin: 1.5rem 0 .35rem; }
-  /* Every bilingual heading puts the English on its own line. Without the
-     block here the two languages run together mid-word — "እንሰበሰባለንWhat". */
-  h2 .en, h3 .en {
-    display: block; color: var(--text-soft); font-weight: 500;
-    font-size: .85rem; line-height: 1.5; margin-top: .15rem;
-  }
+.mark {
+  font-family: var(--geez);
+  color: var(--gold);
+  font-size: clamp(4.2rem, 17vw, 8rem);
+  line-height: 1;
+  margin: 0;
+  letter-spacing: -.01em;
+}
+.romanised {
+  font-family: var(--sans);
+  font-size: .8rem;
+  letter-spacing: .42em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: .9rem 0 0;
+}
+.incipit {
+  border-top: 1px solid var(--gold-dim);
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+}
 
-  p { margin: .5rem 0; }
-  p.am { color: var(--text); }
-  p.en { color: var(--text-soft); font-size: .93rem; }
+/* The thesis. The app's name is the Amharic word for light, and the verse
+   the app happened to be showing the day this page was written is the one
+   about light — so it opens the page rather than being buried in a card. */
+.verse {
+  font-family: var(--geez);
+  font-size: clamp(1.35rem, 5.2vw, 1.9rem);
+  line-height: 1.85;
+  color: var(--ink);
+  margin: 0;
+}
+.verse-en {
+  color: var(--ink-soft);
+  font-size: 1rem;
+  font-style: italic;
+  margin: .85rem 0 0;
+  max-width: 30rem;
+}
+.verse-ref {
+  color: var(--gold);
+  font-size: .82rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  margin: 1.1rem 0 0;
+}
 
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 1.15rem;
-  }
-  .card + .card { margin-top: .85rem; }
+.lede { margin: 2.5rem 0 0; }
+.lede p { margin: 0 0 .9rem; }
+.lede .en { color: var(--ink-soft); }
 
-  /* Download */
-  .dl { text-align: center; }
-  .btn {
-    display: block; width: 100%; background: var(--gold); color: #0B0B0D;
-    font-weight: 700; font-size: 1.05rem; text-decoration: none;
-    padding: 1rem 1.25rem; border-radius: 14px; margin: 1rem 0 .5rem;
-  }
-  .btn:hover, .btn:focus-visible { filter: brightness(1.08); }
-  .meta { color: var(--text-soft); font-size: .85rem; }
-  .meta b { color: var(--text); font-weight: 600; }
-  .sha { color: var(--text-faint); font-size: .7rem; word-break: break-all; margin-top: .5rem; }
+/* ---------- shared ---------- */
+section { padding: 3.25rem 0; border-top: 1px solid var(--rule); }
+section:first-of-type { border-top: 0; }
 
-  .warn { border-color: var(--danger); }
-  .warn h3 { color: var(--danger); margin-top: 0; }
+h2 {
+  font-family: var(--geez);
+  font-size: 1.5rem;
+  line-height: 1.6;
+  margin: 0 0 1.5rem;
+  color: var(--ink);
+  text-wrap: balance;
+}
+h2 .en, h3 .en {
+  display: block;
+  font-family: var(--sans);
+  font-size: .74rem;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: .35rem;
+  line-height: 1.4;
+}
+h3 {
+  font-family: var(--geez);
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin: 0 0 .75rem;
+  color: var(--ink);
+}
+p { margin: 0 0 1rem; }
+p.en, ul.en, .en { color: var(--ink-soft); }
 
-  ol, ul { margin: .5rem 0 .5rem 1.25rem; }
-  li { margin: .35rem 0; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 1.25rem;
+  margin: 0 0 1rem;
+}
+.card.warn { border-color: var(--gold-dim); background: var(--gold-glow); }
 
-  .credit { padding: .8rem 0; border-top: 1px solid var(--border); }
-  .credit:first-of-type { border-top: 0; padding-top: 0; }
-  .credit .name { font-size: .92rem; }
-  .credit .lic { color: var(--gold); font-size: .82rem; }
-  a { color: var(--gold); }
-  a:focus-visible, .btn:focus-visible, nav a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+/* ---------- feature bands: one claim, one real screen ---------- */
+.band { display: grid; gap: 1.75rem; margin-bottom: 3rem; }
+.band:last-child { margin-bottom: 0; }
+.band figure { margin: 0; }
+.band img {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid var(--rule-lit);
+  background: var(--surface);
+}
+.band figcaption {
+  font-size: .78rem;
+  color: var(--ink-faint);
+  margin-top: .6rem;
+  letter-spacing: .04em;
+}
+/* Side by side only once there is genuinely room for both — below this the
+   text column would be narrower than the screenshot beside it. */
+@media (min-width: 46rem) {
+  .band { grid-template-columns: 240px 1fr; align-items: center; gap: 2.75rem; }
+  .band.flip figure { order: 2; }
+}
 
-  footer { padding: 2.5rem 0 3rem; text-align: center; color: var(--text-faint); font-size: .8rem; border-top: 1px solid var(--border); }
+/* ---------- download ---------- */
+.dl { text-align: center; }
+.btn {
+  display: block;
+  background: var(--gold);
+  color: #0B0B0D;
+  font-family: var(--geez);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 1.05rem 1.25rem;
+  border-radius: 12px;
+  line-height: 1.5;
+}
+.btn:hover { filter: brightness(1.07); }
+.meta { margin: .9rem 0 0; font-size: .92rem; color: var(--ink-soft); }
+.meta b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.sha {
+  margin: .55rem 0 0;
+  font-size: .66rem;
+  color: var(--ink-faint);
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+ol, ul { margin: 0 0 1rem; padding-left: 1.25rem; }
+li { margin-bottom: .5rem; }
+
+/* ---------- credits ---------- */
+.credit { padding: .9rem 0; border-top: 1px solid var(--rule); }
+.credit:first-child { border-top: 0; padding-top: 0; }
+.credit:last-child { padding-bottom: 0; }
+.name { font-size: .95rem; }
+.lic { font-size: .82rem; color: var(--ink-faint); margin-top: .2rem; }
+
+/* ---------- jump links + footer ---------- */
+.jump {
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  margin: 2.5rem 0 0; padding: 0; list-style: none;
+}
+.jump a {
+  display: inline-block;
+  font-size: .82rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1px solid var(--rule-lit);
+  border-radius: 999px;
+  padding: .4rem .85rem;
+}
+.jump a:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 2.5rem 0 4rem;
+  color: var(--ink-faint);
+  font-size: .82rem;
+}
+footer p { margin: 0 0 .4rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
 </style>
 </head>
+
 <body>
+<main class="wrap">
 
-<div class="wrap">
+  <!-- ================= HERO ============================================= -->
+  <header class="hero">
+    <h1 class="mark" lang="am">ብርሃን</h1>
+    <p class="romanised">Birhan</p>
 
-  <header>
-    <img src="/assets/birhanlogo.png" alt="" width="72" height="72" />
-    <h1 lang="am">ብርሃን</h1>
-    <div class="latin">BIRHAN</div>
-    <nav>
-      <a href="#download" lang="am">አውርድ · Download</a>
-      <a href="#about" lang="am">ስለ ብርሃን · About</a>
-      <a href="#credits" lang="am">ምንጮች · Credits</a>
-      <a href="#privacy" lang="am">የግላዊነት · Privacy</a>
-      <a href="#contact" lang="am">ያግኙን · Contact</a>
-    </nav>
+    <div class="incipit">
+      <p class="verse" lang="am">እግዚአብሔርም። ብርሃን ይሁን አለ፤ ብርሃንም ሆነ።</p>
+      <p class="verse-en" lang="en">And God said, Let there be light: and there was light.</p>
+      <p class="verse-ref" lang="en">Genesis 1:3</p>
+    </div>
+
+    <div class="lede">
+      <p lang="am">
+        ብርሃን ማለት <b>light</b> ማለት ነው። መጽሐፍ ቅዱስ በአማርኛና በእንግሊዝኛ — ሙሉ በሙሉ
+        በስልክዎ ላይ፣ ያለ ኢንተርኔት። ከቤተ ክርስቲያንዎ የሚመጡ ማስታወቂያዎችና ሰነዶች በአንድ ቦታ።
+      </p>
+      <p class="en" lang="en">
+        Birhan is the Amharic word for light. The Bible in Amharic and English,
+        stored on the phone itself and readable with the radio off — alongside
+        the announcements and documents from your own church. Free. No ads, no
+        trackers.
+      </p>
+    </div>
+
+    <ul class="jump">
+      <li><a href="#download"><span lang="am">አውርድ</span> · Download</a></li>
+      <li><a href="#about"><span lang="am">ስለ ብርሃን</span> · About</a></li>
+      <li><a href="#credits"><span lang="am">ምንጮች</span> · Credits</a></li>
+      <li><a href="#privacy"><span lang="am">የግላዊነት</span> · Privacy</a></li>
+      <li><a href="#contact"><span lang="am">ያግኙን</span> · Contact</a></li>
+    </ul>
   </header>
 
-  <!-- ================= DOWNLOAD — the reason the site exists ============= -->
+  <!-- ================= WHAT IT IS ======================================= -->
+  <section id="about">
+    <h2 lang="am">ብርሃን ምንድን ነው<span class="en" lang="en">What Birhan is</span></h2>
+
+    <div class="band">
+      <figure>
+        <img src="/assets/shots/bible.webp" width="430" height="1790"
+             alt="የመጽሐፍ ቅዱስ ንባብ ገጽ — ኦሪት ዘፍጥረት ምዕራፍ ፩ በአማርኛ። The Bible reading screen showing Genesis chapter 1 in Amharic.">
+        <figcaption lang="en">Genesis 1, read with no connection</figcaption>
+      </figure>
+      <div>
+        <h3 lang="am">መጽሐፍ ቅዱስ ያለ ኢንተርኔት<span class="en" lang="en">The Bible, offline</span></h3>
+        <p lang="am">
+          ሙሉው መጽሐፍ ቅዱስ በመተግበሪያው ውስጥ ተጭኖ ይመጣል። አንዴ ከጫኑት በኋላ ምንም ዳታ
+          አይጠቀምም። አማርኛ፣ እንግሊዝኛ፣ ወይም ሁለቱንም ጎን ለጎን ማንበብ ይችላሉ።
+        </p>
+        <p class="en" lang="en">
+          The whole Bible ships inside the app. After you install it, reading
+          costs nothing — no signal, no data, no waiting. Read Amharic, English,
+          or both side by side.
+        </p>
+      </div>
+    </div>
+
+    <div class="band flip">
+      <figure>
+        <img src="/assets/shots/today.webp" width="430" height="1790"
+             alt="የዛሬ ገጽ — የዕለቱ ቃል እና የንባብ ቀጥል። The Today screen showing the verse of the day and a reading to continue.">
+        <figcaption lang="en">Today — the verse, and where you left off</figcaption>
+      </figure>
+      <div>
+        <h3 lang="am">የቤተ ክርስቲያንዎ መረጃ<span class="en" lang="en">Your church, in one place</span></h3>
+        <p lang="am">
+          ማስታወቂያዎች፣ ሰነዶች፣ እና የዕለቱ ቃል። የሚያዩት የራስዎ ቤተ ክርስቲያን የላከውን ብቻ ነው —
+          ሌላ ቤተ ክርስቲያን የእርስዎን ማየት አይችልም።
+        </p>
+        <p class="en" lang="en">
+          Announcements, documents, and the verse of the day. You see what your
+          own church posts, and only that — other churches cannot see yours.
+        </p>
+      </div>
+    </div>
+
+    <div class="band">
+      <figure>
+        <img src="/assets/shots/settings.webp" width="430" height="1790"
+             alt="የቅንብሮች ገጽ — መለያ፣ መልክ፣ ዳታና ውርዶች። The Settings screen grouped into account, appearance, and data sections.">
+        <figcaption lang="en">Settings — it tells you what it is using</figcaption>
+      </figure>
+      <div>
+        <h3 lang="am">ዳታዎ የእርስዎ ነው<span class="en" lang="en">Your data stays yours</span></h3>
+        <p lang="am">
+          ብርሃን ነፃ ነው። ማስታወቂያ የለም፣ የክትትል መሣሪያ የለም። ትልቅ ፋይል ከማውረዱ በፊት መጠኑን
+          ይነግርዎታል፣ እና ካልፈቀዱ በWiFi ብቻ ያወርዳል።
+        </p>
+        <p class="en" lang="en">
+          Birhan is free, with no advertising and nothing tracking you. It tells
+          you how many megabytes a download will cost before it starts, and stays
+          on Wi-Fi unless you say otherwise.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DOWNLOAD ========================================= -->
   <section id="download">
     <h2 lang="am">መተግበሪያውን ያውርዱ<span class="en" lang="en">Download the app</span></h2>
 
@@ -155,7 +426,7 @@
 
     <div class="card warn">
       <h3 lang="am">ከዚህ በፊት የሙከራ ስሪት ጭነው ከነበረ<span class="en" lang="en">If you installed an earlier test build</span></h3>
-      <p class="am" lang="am">
+      <p lang="am">
         አንድሮይድ በተለያየ ቁልፍ የተፈረመ መተግበሪያን አያዘምንም። ከዚህ በፊት የሙከራ (debug) ስሪት ጭነው
         ከነበረ፣ አዲሱን ከመጫንዎ በፊት አሮጌውን <b>ማራገፍ (uninstall)</b> አለብዎት። አለበለዚያ
         “App not installed” የሚል መልእክት ይመጣል።
@@ -185,29 +456,10 @@
     </div>
   </section>
 
-  <!-- ================= ABOUT ============================================= -->
-  <section id="about">
-    <h2 lang="am">ስለ ብርሃን<span class="en" lang="en">About Birhan</span></h2>
-    <p class="am" lang="am">
-      ብርሃን ለኢትዮጵያ አብያተ ክርስቲያናት የተሠራ መተግበሪያ ነው። መጽሐፍ ቅዱስ ሙሉ በሙሉ ያለ ኢንተርኔት
-      ይሠራል፤ ከዚያም ጎን ለጎን የቤተ ክርስቲያንዎን ማስታወቂያዎችና ሰነዶች በአንድ ቦታ ያገኛሉ።
-    </p>
-    <p class="am" lang="am">
-      ብርሃን ነጻ ነው። ማስታወቂያ የለውም፣ የደንበኝነት ክፍያም የለውም።
-    </p>
-    <p class="en" lang="en">
-      Birhan is an app for Ethiopian churches. The Bible works completely offline,
-      alongside your church's announcements and documents in one place.
-    </p>
-    <p class="en" lang="en">
-      Birhan is free. No ads, no subscriptions.
-    </p>
-  </section>
-
-  <!-- ================= CREDITS — an obligation, not decoration =========== -->
+  <!-- ================= CREDITS ========================================== -->
   <section id="credits">
     <h2 lang="am">ምንጮች እና ፈቃዶች<span class="en" lang="en">Sources &amp; licences</span></h2>
-    <p class="am" lang="am">ይህ መተግበሪያ ከሚከተሉት ክፍት ምንጮች የተውጣጡ ጽሑፎችን ይጠቀማል፦</p>
+    <p lang="am">ይህ መተግበሪያ ከሚከተሉት ክፍት ምንጮች የተውጣጡ ጽሑፎችን ይጠቀማል፦</p>
     <p class="en" lang="en">This app uses text from the following open sources:</p>
 
     <div class="card">
@@ -246,7 +498,7 @@
     <h2 lang="am">የግላዊነት መግለጫ<span class="en" lang="en">Privacy</span></h2>
 
     <h3 lang="am">ምን እንሰበስባለን<span class="en" lang="en">What we collect</span></h3>
-    <p class="am" lang="am">
+    <p lang="am">
       ስምዎን፣ የመረጡትን ቤተ ክርስቲያንና ቅርንጫፍ፣ እና በቤተ ክርስቲያኑ ውስጥ ያለዎትን ድርሻ። ኢሜይል ወይም
       ስልክ ቁጥር — ቢያንስ አንዱ ያስፈልጋል። መለያዎን ሲከፍቱ የቴሌግራም መለያዎን እናረጋግጣለን፤ ይህም እርስዎ
       እውነተኛ ሰው መሆንዎን ለማወቅ ነው።
@@ -259,7 +511,7 @@
     </p>
 
     <h3 lang="am">ማን ሊያየው ይችላል<span class="en" lang="en">Who can see it</span></h3>
-    <p class="am" lang="am">
+    <p lang="am">
       የአባልነት መረጃዎ የሚታየው በራስዎ ቤተ ክርስቲያን ውስጥ ብቻ ነው። ሌሎች አብያተ ክርስቲያናት ሊያዩት
       አይችሉም። ብርሃን መረጃዎን አይሸጥም፣ ለማስታወቂያም አይጠቀምበትም። የክትትል መሣሪያ የለም።
     </p>
@@ -275,13 +527,13 @@
     </p>
 
     <h3 lang="am">መለያዎን መሰረዝ<span class="en" lang="en">Deleting your account</span></h3>
-    <p class="am" lang="am">
-      በመተግበሪያው ውስጥ <b>ተጨማሪ → ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
+    <p lang="am">
+      በመተግበሪያው ውስጥ <b>ቅንብሮች → መለያዬን ሰርዝ</b> ይሂዱ። መለያዎ ይሰረዛል፣ እና ብርሃን
       ከሚያስተዳድራቸው የቤተ ክርስቲያን ቴሌግራም ቡድኖች ይወጣሉ። ያለፉ መልሶችዎ ይቀራሉ፣ ነገር ግን ስምዎ
       ተነስቶ “የተሰረዘ ተጠቃሚ” ተብሎ ይታያል። ይህ የማይቀለበስ ነው።
     </p>
     <p class="en" lang="en">
-      In the app, go to <b>More → Settings → Delete my account</b>. Your account is
+      In the app, go to <b>Settings → Delete my account</b>. Your account is
       deleted and you are removed from the church Telegram groups Birhan manages.
       Past replies stay, with your name taken off them and shown as “Deleted
       user”, so conversations still make sense. This cannot be undone.
@@ -291,21 +543,21 @@
   <!-- ================= CONTACT ========================================== -->
   <section id="contact">
     <h2 lang="am">ያግኙን<span class="en" lang="en">Contact</span></h2>
-    <p class="am" lang="am">
-      ቤተ ክርስቲያንዎን ወደ ብርሃን ማከል ከፈለጉ፣ ወይም ማንኛውም ጥያቄ ካለዎት፣ ይጻፉልን፦
+    <p lang="am">
+      ጥያቄ ካለዎት፣ ወይም ቤተ ክርስቲያንዎን ማስመዝገብ ከፈለጉ፣ በኢሜይል ያግኙን።
     </p>
     <p class="en" lang="en">
-      To add your church to Birhan, or with any question, write to us:
+      Questions, or want your church added? Email
+      <a href="mailto:hello@birhan.online">hello@birhan.online</a>.
     </p>
-    <p><a href="mailto:hello@birhan.online">hello@birhan.online</a></p>
   </section>
 
   <footer>
-    <p lang="am">ብርሃን · Birhan</p>
-    <p lang="en">Made in Ethiopia. Free, no ads, no subscriptions.</p>
+    <p lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት።</p>
+    <p lang="en">Birhan · built for Ethiopian churches · Android only, for now.</p>
   </footer>
 
-</div>
+</main>
 
 <script>
 /* The only script on the page.
@@ -388,6 +640,5 @@
   tryNext(0);
 })();
 </script>
-
 </body>
 </html>
