@@ -336,16 +336,16 @@ footer a{color:var(--gold);text-decoration:none}
 
   html.js .reveal{opacity:0;transform:translateY(20px);
     transition:opacity .65s ease,transform .65s cubic-bezier(.22,.7,.3,1)}
-  .reveal.in{opacity:1;transform:none}
+  html.js .reveal.in{opacity:1;transform:none}
 
   /* children arrive one after another, so a grid reads left to right */
   html.js .stagger > *{opacity:0;transform:translateY(16px)}
-  .stagger.in > *{opacity:1;transform:none;
+  html.js .stagger.in > *{opacity:1;transform:none;
     transition:opacity .55s ease,transform .55s cubic-bezier(.22,.7,.3,1)}
-  .stagger.in > *:nth-child(2){transition-delay:.09s}
-  .stagger.in > *:nth-child(3){transition-delay:.18s}
-  .stagger.in > *:nth-child(4){transition-delay:.27s}
-  .stagger.in > *:nth-child(5){transition-delay:.36s}
+  html.js .stagger.in > *:nth-child(2){transition-delay:.09s}
+  html.js .stagger.in > *:nth-child(3){transition-delay:.18s}
+  html.js .stagger.in > *:nth-child(4){transition-delay:.27s}
+  html.js .stagger.in > *:nth-child(5){transition-delay:.36s}
 
   /* the phone breathes, slowly enough to notice only if you look */
   .device--float{animation:float 9s ease-in-out infinite}
