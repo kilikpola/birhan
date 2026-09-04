@@ -12,15 +12,18 @@
 /* ------------------------------------------------------------------
    Birhan — birhan.online
 
-   No third-party hosts. The Ge'ez face is tried from the reader's own
-   system first and only then fetched from this origin, so a phone that
-   already has an Ethiopic font downloads nothing. There are no trackers
-   and no analytics; the privacy section below says so, and the page has
-   to be able to keep that promise.
+   Built as a page of vellum rather than a product page. Ethiopian
+   manuscripts are written in warm browns on cream, opened with a woven
+   band (ሐረግ / harag), and rubricated — the divine name and the start of
+   a book set in red rather than black. Both of those are used here as
+   typography, not ornament: እግዚአብሔር is red because that is how a scribe
+   writes it, and ብርሃን is gold because it is the word the app is named
+   after.
 
-   Palette and type come from the app's own tokens (src/theme/tokens.ts):
-   gold leaf on near-black, with lapis for links — the colours of an
-   illuminated manuscript, which is where the app's look came from.
+   No third-party hosts. The Ge'ez face is tried from the reader's own
+   system first and only then fetched from this origin. English is set in
+   a humanist serif that ships with virtually every device, so the warmth
+   costs nothing to download. There are no trackers.
    ------------------------------------------------------------------ */
 
 @font-face {
@@ -32,210 +35,205 @@
   font-display: swap;
 }
 
-/* Dark-first: the app is a night-reading app, and this is its ground.
-   Light is the override, not the default. */
+/* Light-first: the page is vellum. Dark is the lamp-lit version of the
+   same page, not a different design. */
 :root {
-  --ground:    #0B0B0D;
-  --surface:   #141417;
-  --raised:    #1C1C21;
-  --rule:      #26262C;
-  --rule-lit:  #35353D;
-  --ink:       #F2EFE9;
-  --ink-soft:  #9B968D;
-  --ink-faint: #63605A;
-  --gold:      #E3A93C;
-  --gold-dim:  #8A671F;
-  --gold-glow: rgba(227,169,60,.12);
-  --lapis:     #5B8BD0;
+  --vellum:    #F1E4CE;
+  --leaf:      #FBF3E4;
+  --edge:      #DFCDAE;
+  --edge-soft: #E8DAC2;
+  --ink:       #2A2018;
+  --ink-soft:  #6A5844;
+  --ink-faint: #94826B;
+  --gold:      #9C6F1E;
+  --gold-lit:  #C89B3F;
+  --rubric:    #A33328;
+  --olive:     #2E5A46;
+  --lapis:     #2B4A78;
 
   --geez: 'Birhan Ethiopic', 'Noto Serif Ethiopic', serif;
+  --serif: Iowan Old Style, 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  --measure: 34rem;
-  --step: clamp(1rem, .8rem + .6vw, 1.15rem);
+  --measure: 33rem;
+  --step: clamp(1.03rem, .95rem + .35vw, 1.18rem);
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --ground:    #FAF8F4;
-    --surface:   #FFFFFF;
-    --raised:    #F1EDE5;
-    --rule:      #E2DDD2;
-    --rule-lit:  #CFC7B8;
-    --ink:       #17161A;
-    --ink-soft:  #5B564E;
-    --ink-faint: #8D877D;
-    --gold:      #A8761C;
-    --gold-dim:  #D6BE8A;
-    --gold-glow: rgba(168,118,28,.10);
-    --lapis:     #2F5FA6;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vellum:    #17120D;
+    --leaf:      #1F1912;
+    --edge:      #34291D;
+    --edge-soft: #2A2118;
+    --ink:       #F0E4D0;
+    --ink-soft:  #B8A488;
+    --ink-faint: #8A7960;
+    --gold:      #E0A94A;
+    --gold-lit:  #F0C877;
+    --rubric:    #D97A66;
+    --olive:     #7FB49B;
+    --lapis:     #8FB0DC;
   }
 }
-:root[data-theme="light"] {
-  --ground:    #FAF8F4;
-  --surface:   #FFFFFF;
-  --raised:    #F1EDE5;
-  --rule:      #E2DDD2;
-  --rule-lit:  #CFC7B8;
-  --ink:       #17161A;
-  --ink-soft:  #5B564E;
-  --ink-faint: #8D877D;
-  --gold:      #A8761C;
-  --gold-dim:  #D6BE8A;
-  --gold-glow: rgba(168,118,28,.10);
-  --lapis:     #2F5FA6;
+:root[data-theme="dark"] {
+  --vellum:    #17120D;
+  --leaf:      #1F1912;
+  --edge:      #34291D;
+  --edge-soft: #2A2118;
+  --ink:       #F0E4D0;
+  --ink-soft:  #B8A488;
+  --ink-faint: #8A7960;
+  --gold:      #E0A94A;
+  --gold-lit:  #F0C877;
+  --rubric:    #D97A66;
+  --olive:     #7FB49B;
+  --lapis:     #8FB0DC;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-
 html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--ground);
+  background: var(--vellum);
   color: var(--ink);
-  font-family: var(--sans);
+  font-family: var(--serif);
   font-size: var(--step);
-  line-height: 1.6;
+  line-height: 1.68;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Ge'ez needs a taller line box than Latin — roughly 1.9. Every Amharic
-   block on this page inherits it, so the two scripts never collide when
-   they sit one under the other. */
+/* Ge'ez wants a taller line box than Latin — about 1.9. */
 [lang="am"] { font-family: var(--geez); line-height: 1.9; }
 
-.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
-
-/* The reading measure lives on the blocks, not the page, so prose stays at a
-   comfortable line length while the screenshot bands are allowed the extra
-   width they need to sit beside their text instead of being squeezed. */
+.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.4rem; }
 .hero, section, footer { max-width: var(--measure); margin-inline: auto; }
 #about { --measure: 48rem; }
 
-a { color: var(--lapis); }
-a:focus-visible, .btn:focus-visible, .jump a:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 3px;
-  border-radius: 3px;
+a { color: var(--lapis); text-underline-offset: .18em; }
+a:focus-visible, .btn:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 2px;
 }
 
-/* ---------- hero: a manuscript incipit ---------- */
-.hero { padding: 4.5rem 0 2.5rem; }
+/* ---------- harag: the woven band a book opens with ---------- */
+.harag { display: block; width: 100%; height: 26px; margin: 2.5rem 0 0; }
+.harag--foot { margin: 0 0 2rem; opacity: .75; }
+
+/* ---------- the incipit ---------- */
+.hero { padding: 3rem 0 1rem; }
 
 .mark {
   font-family: var(--geez);
   color: var(--gold);
-  font-size: clamp(4.2rem, 17vw, 8rem);
-  line-height: 1;
-  margin: 0;
-  letter-spacing: -.01em;
+  font-size: clamp(3.9rem, 16vw, 7rem);
+  line-height: 1.05;
+  margin: 1.75rem 0 0;
+  font-weight: 400;
 }
 .romanised {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-faint);
+  margin: .3rem 0 0;
+  letter-spacing: .06em;
+}
+
+.verse { margin: 2.25rem 0 0; }
+.verse p { margin: 0; }
+.verse .am {
+  font-family: var(--geez);
+  font-size: clamp(1.3rem, 5vw, 1.75rem);
+  line-height: 1.9;
+}
+/* Rubrication. Red for the divine name, gold for the word this app is
+   named after — the two things a scribe would have lifted off the page. */
+.rubric { color: var(--rubric); }
+.gilt   { color: var(--gold); }
+
+.verse .en {
+  font-style: italic;
+  color: var(--ink-soft);
+  margin-top: .9rem;
+  font-size: 1.02rem;
+}
+.verse .ref {
   font-family: var(--sans);
-  font-size: .8rem;
-  letter-spacing: .42em;
+  font-size: .72rem;
+  letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin: .9rem 0 0;
-}
-.incipit {
-  border-top: 1px solid var(--gold-dim);
-  margin-top: 1.75rem;
-  padding-top: 1.75rem;
+  margin-top: 1rem;
 }
 
-/* The thesis. The app's name is the Amharic word for light, and the verse
-   the app happened to be showing the day this page was written is the one
-   about light — so it opens the page rather than being buried in a card. */
-.verse {
-  font-family: var(--geez);
-  font-size: clamp(1.35rem, 5.2vw, 1.9rem);
-  line-height: 1.85;
+/* ---------- a hand's worth of warmth in the opening lines ---------- */
+.opening { margin: 2.5rem 0 0; }
+.opening p { margin: 0 0 1rem; }
+.opening .lead {
+  font-size: 1.3rem;
+  line-height: 1.55;
   color: var(--ink);
-  margin: 0;
 }
-.verse-en {
+.opening .en { color: var(--ink-soft); }
+
+.jump { display: flex; flex-wrap: wrap; gap: .55rem; margin: 2.25rem 0 0; padding: 0; list-style: none; }
+.jump a {
+  font-family: var(--sans);
+  font-size: .8rem;
   color: var(--ink-soft);
-  font-size: 1rem;
-  font-style: italic;
-  margin: .85rem 0 0;
-  max-width: 30rem;
+  text-decoration: none;
+  border-bottom: 1px solid var(--edge);
+  padding: .2rem 0;
 }
-.verse-ref {
-  color: var(--gold);
-  font-size: .82rem;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  margin: 1.1rem 0 0;
-}
+.jump a:hover { color: var(--gold); border-color: var(--gold); }
 
-.lede { margin: 2.5rem 0 0; }
-.lede p { margin: 0 0 .9rem; }
-.lede .en { color: var(--ink-soft); }
-
-/* ---------- shared ---------- */
-section { padding: 3.25rem 0; border-top: 1px solid var(--rule); }
-section:first-of-type { border-top: 0; }
+/* ---------- sections ---------- */
+section { padding: 3.5rem 0; }
+section + section { border-top: 1px solid var(--edge-soft); }
 
 h2 {
   font-family: var(--geez);
-  font-size: 1.5rem;
-  line-height: 1.6;
-  margin: 0 0 1.5rem;
-  color: var(--ink);
+  font-size: 1.45rem;
+  line-height: 1.65;
+  margin: 0 0 .35rem;
+  font-weight: 400;
   text-wrap: balance;
 }
 h2 .en, h3 .en {
   display: block;
   font-family: var(--sans);
-  font-size: .74rem;
-  letter-spacing: .22em;
+  font-size: .7rem;
+  letter-spacing: .2em;
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin-top: .35rem;
-  line-height: 1.4;
+  margin-top: .3rem;
 }
-h3 {
-  font-family: var(--geez);
-  font-size: 1.1rem;
-  line-height: 1.7;
-  margin: 0 0 .75rem;
-  color: var(--ink);
-}
+h2 + p, h2 + .band { margin-top: 1.6rem; }
+h3 { font-family: var(--geez); font-size: 1.05rem; line-height: 1.75; margin: 0 0 .6rem; font-weight: 400; }
 p { margin: 0 0 1rem; }
-p.en, ul.en, .en { color: var(--ink-soft); }
+.en { color: var(--ink-soft); }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  padding: 1.25rem;
+  background: var(--leaf);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  padding: 1.3rem;
   margin: 0 0 1rem;
 }
-.card.warn { border-color: var(--gold-dim); background: var(--gold-glow); }
+.card.warn { border-left: 3px solid var(--rubric); }
 
-/* ---------- feature bands: one claim, one real screen ---------- */
-.band { display: grid; gap: 1.75rem; margin-bottom: 3rem; }
+/* ---------- bands ---------- */
+.band { display: grid; gap: 1.75rem; margin-bottom: 3.25rem; }
 .band:last-child { margin-bottom: 0; }
 .band figure { margin: 0; }
 .band img {
-  display: block;
-  width: 100%;
-  max-width: 260px;
-  height: auto;
-  border-radius: 16px;
-  border: 1px solid var(--rule-lit);
-  background: var(--surface);
+  display: block; width: 100%; max-width: 240px; height: auto;
+  border-radius: 10px; border: 1px solid var(--edge);
 }
 .band figcaption {
-  font-size: .78rem;
-  color: var(--ink-faint);
-  margin-top: .6rem;
-  letter-spacing: .04em;
+  font-family: var(--serif); font-style: italic;
+  font-size: .85rem; color: var(--ink-faint); margin-top: .65rem;
 }
-/* Side by side only once there is genuinely room for both — below this the
-   text column would be narrower than the screenshot beside it. */
 @media (min-width: 46rem) {
   .band { grid-template-columns: 240px 1fr; align-items: center; gap: 2.75rem; }
   .band.flip figure { order: 2; }
@@ -246,63 +244,37 @@ p.en, ul.en, .en { color: var(--ink-soft); }
 .btn {
   display: block;
   background: var(--gold);
-  color: #0B0B0D;
+  color: var(--leaf);
   font-family: var(--geez);
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1.18rem;
   text-decoration: none;
-  padding: 1.05rem 1.25rem;
-  border-radius: 12px;
-  line-height: 1.5;
+  padding: 1rem 1.25rem;
+  border-radius: 3px;
+  line-height: 1.6;
 }
-.btn:hover { filter: brightness(1.07); }
-.meta { margin: .9rem 0 0; font-size: .92rem; color: var(--ink-soft); }
+.btn:hover { background: var(--gold-lit); }
+.meta { margin: .9rem 0 0; font-size: .95rem; color: var(--ink-soft); }
 .meta b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .sha {
-  margin: .55rem 0 0;
-  font-size: .66rem;
-  color: var(--ink-faint);
-  word-break: break-all;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin: .5rem 0 0; font-size: .64rem; color: var(--ink-faint);
+  word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-ol, ul { margin: 0 0 1rem; padding-left: 1.25rem; }
+ol, ul { margin: 0 0 1rem; padding-left: 1.15rem; }
 li { margin-bottom: .5rem; }
 
 /* ---------- credits ---------- */
-.credit { padding: .9rem 0; border-top: 1px solid var(--rule); }
+.credit { padding: .85rem 0; border-top: 1px solid var(--edge-soft); }
 .credit:first-child { border-top: 0; padding-top: 0; }
 .credit:last-child { padding-bottom: 0; }
-.name { font-size: .95rem; }
-.lic { font-size: .82rem; color: var(--ink-faint); margin-top: .2rem; }
+.name { font-size: .97rem; }
+.lic { font-family: var(--sans); font-size: .78rem; color: var(--ink-faint); margin-top: .2rem; }
 
-/* ---------- jump links + footer ---------- */
-.jump {
-  display: flex; flex-wrap: wrap; gap: .5rem;
-  margin: 2.5rem 0 0; padding: 0; list-style: none;
-}
-.jump a {
-  display: inline-block;
-  font-size: .82rem;
-  color: var(--ink-soft);
-  text-decoration: none;
-  border: 1px solid var(--rule-lit);
-  border-radius: 999px;
-  padding: .4rem .85rem;
-}
-.jump a:hover { color: var(--gold); border-color: var(--gold-dim); }
+footer { padding: 2rem 0 4rem; color: var(--ink-faint); font-size: .88rem; }
+footer p { margin: 0 0 .35rem; }
+footer .am { font-family: var(--geez); }
 
-footer {
-  border-top: 1px solid var(--rule);
-  padding: 2.5rem 0 4rem;
-  color: var(--ink-faint);
-  font-size: .82rem;
-}
-footer p { margin: 0 0 .4rem; }
-
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
-}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 
@@ -311,25 +283,49 @@ footer p { margin: 0 0 .4rem; }
 
   <!-- ================= HERO ============================================= -->
   <header class="hero">
-    <h1 class="mark" lang="am">ብርሃን</h1>
-    <p class="romanised">Birhan</p>
+  <!-- ሐረግ / harag — the woven band an Ethiopian manuscript opens with.
+       Drawn here rather than fetched: it is a few hundred bytes of SVG and
+       it tiles, so it costs nothing on a metered connection. -->
+  <svg class="harag" viewBox="0 0 240 26" preserveAspectRatio="none" role="presentation" aria-hidden="true">
+    <defs>
+      <pattern id="hg" width="60" height="26" patternUnits="userSpaceOnUse">
+        <path d="M0 13C10 1 20 1 30 13 40 25 50 25 60 13"
+              fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M0 13C10 25 20 25 30 13 40 1 50 1 60 13"
+              fill="none" stroke="var(--olive)" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="30" cy="13" r="2.6" fill="var(--rubric)"/>
+        <circle cx="0"  cy="13" r="1.6" fill="var(--gold)"/>
+        <circle cx="60" cy="13" r="1.6" fill="var(--gold)"/>
+      </pattern>
+    </defs>
+    <rect width="240" height="26" fill="url(#hg)"/>
+  </svg>
 
-    <div class="incipit">
-      <p class="verse" lang="am">እግዚአብሔርም። ብርሃን ይሁን አለ፤ ብርሃንም ሆነ።</p>
-      <p class="verse-en" lang="en">And God said, Let there be light: and there was light.</p>
-      <p class="verse-ref" lang="en">Genesis 1:3</p>
+    <h1 class="mark" lang="am">ብርሃን</h1>
+    <p class="romanised">Birhan — “light”</p>
+
+    <div class="verse">
+      <!-- Set the way a scribe would: the divine name in red, and the word
+           the app is named after in gold. -->
+      <p class="am" lang="am"><span class="rubric">እግዚአብሔርም</span>። <span class="gilt">ብርሃን</span> ይሁን አለ፤ <span class="gilt">ብርሃንም</span> ሆነ።</p>
+      <p class="en" lang="en">And God said, Let there be light: and there was light.</p>
+      <p class="ref" lang="en">Genesis 1:3</p>
     </div>
 
-    <div class="lede">
-      <p lang="am">
-        ብርሃን ማለት <b>light</b> ማለት ነው። መጽሐፍ ቅዱስ በአማርኛና በእንግሊዝኛ — ሙሉ በሙሉ
-        በስልክዎ ላይ፣ ያለ ኢንተርኔት። ከቤተ ክርስቲያንዎ የሚመጡ ማስታወቂያዎችና ሰነዶች በአንድ ቦታ።
+    <div class="opening">
+      <p class="lead" lang="am">
+        መረቡ ይጠፋል። መብራቱ ይሄዳል። መጽሐፍ ቅዱሱ ግን አለ።
       </p>
       <p class="en" lang="en">
-        Birhan is the Amharic word for light. The Bible in Amharic and English,
-        stored on the phone itself and readable with the radio off — alongside
-        the announcements and documents from your own church. Free. No ads, no
-        trackers.
+        The signal drops. The power goes. The Bible is still there — all of it,
+        in Amharic and English, sitting on the phone in your hand rather than on
+        someone else’s computer.
+      </p>
+      <p class="en" lang="en">
+        Birhan was made for churches in Ethiopia: for a phone that cost less than
+        a month of data, in a room where the bars come and go. Reading never costs
+        you anything. Your church’s announcements and documents are in the same
+        place. It is free, there are no adverts, and nothing here is watching you.
       </p>
     </div>
 
@@ -552,9 +548,13 @@ footer p { margin: 0 0 .4rem; }
     </p>
   </section>
 
+  <svg class="harag harag--foot" viewBox="0 0 240 26" preserveAspectRatio="none" role="presentation" aria-hidden="true">
+    <rect width="240" height="26" fill="url(#hg)"/>
+  </svg>
+
   <footer>
-    <p lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት።</p>
-    <p lang="en">Birhan · built for Ethiopian churches · Android only, for now.</p>
+    <p class="am" lang="am">ብርሃን — ለኢትዮጵያ አብያተ ክርስቲያናት በፍቅር የተሠራ።</p>
+    <p lang="en">Birhan · made for Ethiopian churches · Android, for now.</p>
   </footer>
 
 </main>
