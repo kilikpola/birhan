@@ -19,6 +19,7 @@ import AppTabs from '../components/app-tabs';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { usePushNotifications } from '../lib/push';
 import { EmailVerificationScreen } from '../components/auth/email-verification-screen';
+import { Onboarding } from '../components/onboarding';
 import Auth from './auth';
 import { ErrorBoundary } from '../components/error-boundary';
 import { ToastProvider } from '../components/toast';
@@ -103,8 +104,29 @@ function Gate({ children }: { children: React.ReactNode }) {
   const { c, lang } = useApp();
   // Register for push once signed in (no-op offline / without a token).
   usePushNotifications(session?.user?.id);
+
+  // First-run walkthrough. Read once from disk; null means "don't know yet".
+  // A signed-in user never reaches the branch that shows it, so a returning
+  // account is never made to sit through the introduction again.
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem(PREF_ONBOARDED)
+      .then((v) => setOnboarded(v === '1'))
+      .catch(() => setOnboarded(true)); // storage trouble: don't trap the user
+  }, []);
+  const finishOnboarding = useCallback(() => {
+    setOnboarded(true);
+    AsyncStorage.setItem(PREF_ONBOARDED, '1').catch(() => {});
+  }, []);
+
   if (!ready) return <Booting c={c} />;  // reading session from disk — instant, offline
-  if (!session) return <Auth />;         // first run: show login
+  if (!session) {
+    // Only a new, signed-out person sees the walkthrough, and only before the
+    // "don't know yet" resolves are we willing to wait — that read is instant.
+    if (onboarded === null) return <Booting c={c} />;
+    if (!onboarded) return <Onboarding c={c} lang={lang} onDone={finishOnboarding} />;
+    return <Auth />;                     // returning, signed out: straight to login
+  }
   // Shown once, right after a signup that included an email. Dismissable —
   // an unverified account can read and use everything else, so this never
   // blocks re-entry to the app on a later launch (see auth.tsx's
@@ -128,6 +150,7 @@ const PREF_NIGHT = 'birhan:night';
 const PREF_LANG = 'birhan:lang';
 const PREF_THEME_MODE = 'birhan:theme_mode';
 const PREF_READING_LANG = 'birhan:reading_lang';
+const PREF_ONBOARDED = 'birhan:onboarded';
 
 /** Fonts are bundled, so they load in milliseconds — but never hold the app
  *  hostage to them. After this long, fall back to system fonts and continue. */
