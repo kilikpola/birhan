@@ -386,3 +386,91 @@ footer a{color:var(--gold);text-decoration:none}
 .shots figure{margin:0;display:flex;flex-direction:column;gap:.9rem;align-items:center;text-align:center}
 .shots .device{width:min(240px,70vw)}
 .shots figcaption{font-size:.88rem;color:var(--tx-3);line-height:1.5;max-width:22rem}
+
+/* ================= richer motion layer ============================
+   Everything below is additive and follows the same two rules as the
+   base layer: hidden states apply only under html.js so a no-JS reader
+   is never shown a blank page, and each pair (hidden + shown) is gated
+   at matching specificity so .in always wins. All behind reduced-motion.
+   ================================================================== */
+
+/* scroll progress — a thin gold seam across the top */
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;transform-origin:0 50%;
+  transform:scaleX(0);background:linear-gradient(90deg,var(--gold),var(--gold-2));
+  z-index:60;pointer-events:none}
+
+@media (prefers-reduced-motion:no-preference){
+
+  /* ambient aurora drifting behind the hero — slow enough to read as light,
+     not motion. Two blobs on opposite cycles. */
+  .hero{position:relative;isolation:isolate}
+  .hero::after{
+    content:'';position:absolute;inset:-40% -20% auto -20%;height:80vmax;z-index:-1;
+    background:
+      radial-gradient(38% 44% at 22% 34%, var(--glow), transparent 70%),
+      radial-gradient(34% 40% at 82% 20%, rgba(91,139,208,.10), transparent 72%);
+    filter:blur(6px);
+    animation:aurora 22s ease-in-out infinite alternate;
+  }
+  @keyframes aurora{
+    0%  {transform:translate3d(0,0,0) scale(1)}
+    50% {transform:translate3d(2%,-3%,0) scale(1.06)}
+    100%{transform:translate3d(-2%,2%,0) scale(1.02)}
+  }
+
+  /* directional reveal: sections arrive from alternating sides, so the page
+     has a rhythm as you scroll rather than everything sliding up. */
+  html.js .slide-l{opacity:0;transform:translateX(-34px)}
+  html.js .slide-r{opacity:0;transform:translateX(34px)}
+  html.js .slide-l.in,html.js .slide-r.in{opacity:1;transform:none}
+  html.js .slide-l,html.js .slide-r{
+    transition:opacity .7s ease,transform .7s cubic-bezier(.22,.7,.3,1)}
+
+  /* the hero phone drifts on scroll — set from JS via --pary */
+  .device--parallax{will-change:transform;
+    transform:rotate(-1.4deg) translateY(var(--pary,0))}
+  /* the float and the parallax must not fight: parallax wins while scrolling,
+     float takes over at rest via the same variable being eased to 0 */
+
+  /* headline word that fades between languages of "light" */
+  .lightword{position:relative;display:inline-block;color:var(--gold)}
+  .lightword::after{content:'';position:absolute;left:0;right:0;bottom:-.06em;height:2px;
+    background:var(--gold);transform:scaleX(0);transform-origin:0 50%;
+    animation:underline 1.1s .8s cubic-bezier(.22,.7,.3,1) forwards}
+  @keyframes underline{to{transform:scaleX(1)}}
+
+  /* cards get a soft gold wash that sweeps on hover */
+  .card,.plat--ready{position:relative;overflow:hidden}
+  .card::before,.plat--ready::before{
+    content:'';position:absolute;inset:0;z-index:0;opacity:0;
+    background:radial-gradient(60% 80% at 50% 0%, var(--glow), transparent 70%);
+    transition:opacity .35s ease}
+  .card:hover::before,.plat--ready:hover::before{opacity:1}
+  .card > *,.plat--ready > *{position:relative;z-index:1}
+
+  /* buttons lift with a specular sheen */
+  .btn{position:relative;overflow:hidden}
+  .btn::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);
+    transform:skewX(-18deg);transition:left .55s ease}
+  .btn:hover::after{left:130%}
+
+  /* chips pop in one by one under the hero */
+  html.js .chips li{opacity:0;transform:translateY(8px) scale(.96)}
+  html.js .chips.in li{opacity:1;transform:none;
+    transition:opacity .4s ease,transform .4s cubic-bezier(.22,.7,.3,1)}
+  html.js .chips.in li:nth-child(2){transition-delay:.08s}
+  html.js .chips.in li:nth-child(3){transition-delay:.16s}
+
+  /* table rows deal in as the table reveals */
+  html.js .vtable tbody tr{opacity:0;transform:translateY(10px)}
+  html.js .vtable.in tbody tr{opacity:1;transform:none;
+    transition:opacity .45s ease,transform .45s cubic-bezier(.22,.7,.3,1)}
+  html.js .vtable.in tbody tr:nth-child(2){transition-delay:.05s}
+  html.js .vtable.in tbody tr:nth-child(3){transition-delay:.1s}
+  html.js .vtable.in tbody tr:nth-child(4){transition-delay:.15s}
+  html.js .vtable.in tbody tr:nth-child(5){transition-delay:.2s}
+  html.js .vtable.in tbody tr:nth-child(6){transition-delay:.25s}
+  html.js .vtable.in tbody tr:nth-child(7){transition-delay:.3s}
+  html.js .vtable.in tbody tr:nth-child(n+8){transition-delay:.35s}
+}

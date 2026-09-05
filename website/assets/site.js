@@ -84,7 +84,7 @@
 /* Reveal on scroll. Anything not observed stays visible, so the page reads
    fully if this never runs or motion is turned down. */
 (function () {
-  var els = document.querySelectorAll('.reveal,.stagger');
+  var els = document.querySelectorAll('.reveal,.stagger,.slide-l,.slide-r,.chips,.vtable');
   if (!els.length) return;
   if (!('IntersectionObserver' in window) ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -103,4 +103,39 @@
   setTimeout(function () {
     [].forEach.call(els, function (e) { e.classList.add('in'); });
   }, 2500);
+})();
+
+
+/* Scroll-driven flourishes: a progress seam at the top and a gentle parallax
+   on the hero phone. Both are pure decoration — skipped entirely when the
+   reader has asked for reduced motion, and absent-safe if elements are gone. */
+(function () {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var bar = document.createElement('div');
+  bar.className = 'progress';
+  document.body.appendChild(bar);
+
+  var phone = document.querySelector('.device--float');
+  if (phone) phone.classList.add('device--parallax');
+
+  var ticking = false;
+  function frame() {
+    ticking = false;
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var p = max > 0 ? h.scrollTop / max : 0;
+    bar.style.transform = 'scaleX(' + p.toFixed(4) + ')';
+
+    if (phone) {
+      // drift up to ~22px as the hero scrolls past, eased back to rest
+      var y = Math.max(-22, Math.min(0, -h.scrollTop * 0.06));
+      phone.style.setProperty('--pary', y.toFixed(1) + 'px');
+    }
+  }
+  function onScroll() {
+    if (!ticking) { ticking = true; requestAnimationFrame(frame); }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  frame();
 })();
