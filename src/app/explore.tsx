@@ -203,6 +203,7 @@ export default function SettingsScreen() {
         <SectionBoundary name="Settings.About">
           <Section c={c} lang={lang} title={t(lang, 'sectionAbout')}>
             <Card c={c}>
+              <Row c={c} lang={lang} label={t(lang, 'helpRow')} onPress={() => router.push('/help' as Href)} />
               <Row c={c} lang={lang} label={t(lang, 'about')} onPress={() => router.push('/about' as Href)} />
               <Row
                 c={c}
