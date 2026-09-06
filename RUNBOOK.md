@@ -1,122 +1,149 @@
 # Birhan — Operations Runbook
 
 What to do when something breaks, ships, or needs rolling back. Keep this short
-and current. Surfaces: **mobile app** (Expo/EAS), **admin web** (Cloudflare Pages),
-**backend** (Supabase — Postgres + Edge Functions).
+and current.
+
+Everything runs on **one VPS** — there is no Supabase, no Cloudflare, no CI/CD,
+no staging, and no git remote. Deploys are run **by hand from a dev machine**
+over SSH. Surfaces:
+
+- **Mobile app** — Expo (SDK 57) → release APK. Distributed as a download, not a
+  store: APKs live at `birhan.online/downloads/`, and the app self-updates by
+  polling a manifest (below).
+- **Backend API** — a Node/Hono service (`birhan-api.service`, systemd) on the
+  VPS, reverse-proxied by nginx at `api.birhan.online`.
+- **Admin console** — a static Vite SPA under `/var/www/admin.birhan.online`,
+  behind nginx **HTTP basic auth**.
+- **Marketing site** — static files under `/var/www/birhan.online` (the
+  `website/` dir), including `/downloads/*.apk`.
+
+**The one host:** `root@191.215.40.44`, key `~/.ssh/birhan_deploy`. The key
+works **only as `root`** — `ssh birhan@…` is refused. Postgres and MinIO run as
+docker containers (`birhan-backend-postgres-1`, `birhan-backend-minio-1`); the
+API itself does **not** — it is a plain systemd process.
 
 ---
 
-## When the site/app is down — first checks, in order
+## When something is down — first checks, in order
 
-1. **Is it the backend?** Hit the health endpoint:
-   `curl https://<PROD_REF>.functions.supabase.co/functions/v1/health`
-   - `200 {"status":"ok"}` → Postgres is reachable; problem is elsewhere (client/CDN).
-   - `503` or timeout → **Supabase**. Check the [Supabase status page] and your
-     project dashboard → is it paused (free tier auto-pauses ~7 days idle), out of
-     connections, or mid-incident?
-2. **Is it the admin console only?** Open https://admin.birhan.cc. If it 404s/whites
-   out but the app works, it's **Cloudflare Pages** — check the Pages dashboard for a
-   bad last deploy; roll it back (below).
-3. **Is it the mobile app only?** The offline Bible always works (bundled). If sign-in
-   / announcements fail but health is 200, suspect the **auth hook** (a 500 on every
-   login means the custom access token hook is erroring) or a bad OTA update.
-4. **What changed?** Look at the most recent deploy (Actions → Deploy) and the newest
-   Sentry release. Most outages are the last deploy — when in doubt, roll back, then
-   diagnose.
-
----
-
-## Reading a Sentry alert
-
-Alerts arrive in Slack/email (not digest). For each:
-1. Open the issue → check **environment** (staging vs production) and **release**
-   (commit SHA) tags. Staging noise is not an incident.
-2. **Blast radius:** "Events" + "Users affected". One user vs thousands changes urgency.
-3. **Regression?** If the release tag is the latest deploy and the error is new →
-   likely that deploy → consider rollback.
-4. **request_id** (Edge Function events) correlates the Sentry event with Supabase
-   function logs — search the logs for it.
-5. Triage: assign/resolve/ignore. A resolved issue that recurs re-alerts.
-
-Alert rules to have configured (Sentry → each project → Alerts): **new issue** and
-**error-rate spike**, both → Slack, real-time. See `docs/MONITORING.md §5`.
+1. **Backend?** `curl https://api.birhan.online/api/v1/health` → expect `200`.
+   - Not 200 → `ssh root@191.215.40.44 'systemctl status birhan-api.service'`
+     and `journalctl -u birhan-api.service -n 50`. It restarts on crash
+     (`Restart=always`) and takes **~3s** to start listening — don't judge a
+     restart before then.
+   - 200 but writes fail → check the docker DB: `docker ps` (is
+     `birhan-backend-postgres-1` healthy?), and `journalctl` for DB connection
+     errors.
+2. **Admin console only?** It returns **401 for everyone** (basic auth) — that is
+   normal, not an outage. To check a deploy landed, look at the files on disk
+   (`ssh root@… 'ls /var/www/admin.birhan.online/assets/'`), not the public URL.
+   A blank page after login usually means the bundle points at the wrong API —
+   rebuilt without `VITE_API_URL`.
+3. **Mobile app only?** The offline Bible always works (bundled). If sign-in or
+   announcements fail while health is 200, suspect the API or a stale
+   `CORS_ORIGINS`. A bad build is fixed by shipping the next versionCode, not by
+   pulling the old one — installed apps keep working.
+4. **What changed?** There is no deploy log but the newest Sentry release and the
+   last thing you deployed by hand are the usual suspects.
 
 ---
 
-## Rolling back production
+## Deploying
 
-**One command / the auto-revert already tried.** A failed post-deploy health/smoke
-auto-runs `scripts/rollback.sh`. To roll back manually:
+### Backend API
+The server dir `/home/birhan/birhan-backend` is **not a git checkout** (seeded
+from a tarball); it is built **on the server**.
 
 ```bash
-export CLOUDFLARE_API_TOKEN=…  CLOUDFLARE_ACCOUNT_ID=…  CF_PAGES_PROJECT=birhan-admin
-export SUPABASE_ACCESS_TOKEN=…  PROD_SUPABASE_PROJECT_REF=…
-export PREV_RELEASE_REF=$(git tag --list 'release-*' | sort | tail -2 | head -1)
-bash scripts/rollback.sh
+H=root@191.215.40.44; K=~/.ssh/birhan_deploy; D=/home/birhan/birhan-backend
+# 0. back up what's live (src + the built dist) so rollback is a restore
+ssh -i $K $H "cd $D && tar czf /root/birhan-backend-pre-\$(date +%F-%H%M).tgz src dist"
+# 1. copy changed sources up, hand them to the birhan user
+scp -i $K backend/src/<changed>.ts $H:$D/src/<same path>
+ssh -i $K $H "chown -R birhan:birhan $D/src"
+# 2. build (tsc → dist/) and restart, AS the birhan user's toolchain
+ssh -i $K $H "su - birhan -c 'export PATH=/home/birhan/node22/bin:\$PATH; cd $D && npm run build'"
+ssh -i $K $H "systemctl restart birhan-api.service"
+# 3. verify (wait for boot)
+sleep 4; curl -fsS https://api.birhan.online/api/v1/health
 ```
+No dependency change → no `npm ci` needed. Schema changes need a migration run
+against the docker Postgres before restart.
 
-This rolls **admin web** back to the previous Cloudflare deployment and redeploys
-**Edge Functions** from the previous `release-*` tag. It intentionally **does not
-touch the database** — migrations are expand-then-contract (see
-`supabase/MIGRATIONS.md`), so the previous release runs fine against the current
-schema. If a *migration* is the culprit, forward-fix with a new migration; do not
-hand-revert schema under pressure.
+### Admin console
+```bash
+VITE_API_URL=https://api.birhan.online ./admin-web/deploy.sh
+```
+Builds, **strips `dist/assets/*.map`** (source maps must never ship — they leaked
+the source once), `rsync --delete`s to `/var/www/admin.birhan.online`, and chowns
+to `www-data`. `VITE_API_URL` is **required** and is not in `.env.local`; the
+value is in `admin-web/.env.example`.
 
-- **Admin web only, fastest:** Cloudflare dashboard → Pages → project → Deployments →
-  previous good deploy → **Rollback**. One click.
-- **Mobile (OTA):** `eas update:rollback` (or republish the previous update to the
-  `production` channel). A bad *native* build requires a new store submission — there
-  is no instant native rollback, which is why native changes ship rarely and staged.
+### Marketing site + APK
+Static `website/` files rsync to `/var/www/birhan.online`. A new APK goes to
+`/downloads/birhan-<version>.apk` (and `birhan.apk`) via a resumable `.part`
+upload, a **server-side SHA-256 check before the atomic swap**, then the update
+manifest is published (below). Old APKs are never deleted — they are the mobile
+rollback targets.
 
 ---
 
-## Promoting to production
+## Mobile self-update (how the app upgrades itself)
 
-1. Merge to `main` → the **Deploy** workflow auto-deploys to **staging** and smoke-tests it.
-2. Verify staging (https://admin-staging.birhan.cc, exercise the changed path).
-3. Actions → the running Deploy → the **production** job is **waiting for approval**.
-   A reviewer approves it (GitHub Environment gate).
-4. Prod deploy runs migrations → functions → admin web → **health + smoke**. If smoke
-   fails it **auto-reverts** and the run goes red. On success it tags `release-*`.
+The app polls a JSON manifest and offers the download when `versionCode` is
+higher than the installed one. The manifest is served from **two** places and
+both must agree:
 
-Never push straight to production; there is no path that skips staging + approval.
+- `https://updates.birhan.online/birhan/latest.json`  (what the app reads)
+- `https://birhan.online/latest.json`                 (what the download page reads)
 
----
-
-## Deploy pipeline at a glance
-
-```
-PR  ─▶ CI (tsc, jest, deno, build)  +  Cloudflare preview URL
-        │  (RLS integration job on supabase/** changes)
-merge ─▶ main
-        └─▶ Deploy: STAGING (auto) ─▶ smoke
-                    PRODUCTION (manual approval) ─▶ migrate ─▶ deploy ─▶ health+smoke
-                                                   └─ fail ⇒ auto-revert + red run
-```
+Shape: `versionCode`, `versionName`, `apkUrl`, `sha256`, `sizeBytes`,
+`releasedAt`, `minSupportedVersionCode`, `notes_am`, `notes_en`, `mandatory`.
+Publishing a release writes both files; a mismatch (e.g. only one updated) is the
+classic "some users see the update, some don't" bug.
 
 ---
 
-## Secrets & setup — what a human must provision (NOT in the repo)
+## Rolling back
 
-GitHub → Settings → Secrets and variables → Actions. **Secrets:**
+- **API:** restore the most recent pre-deploy tarball and restart — it contains
+  the previous `dist/`, so no rebuild is needed.
+  ```bash
+  ssh -i $K $H "cd $D && tar xzf /root/birhan-backend-pre-<stamp>.tgz && systemctl restart birhan-api.service"
+  ```
+- **Admin console:** `deploy.sh --delete` wipes the server's previous bundle, so
+  roll back by rebuilding from the previous git commit and re-running `deploy.sh`
+  (your local `admin-web/dist/` from the prior build also works as-is).
+- **Mobile:** repoint **both** manifests at the previous `versionCode`/APK (still
+  present under `/downloads`). This stops offering the bad version; it does **not**
+  downgrade already-installed apps — a bad *native* bug is escaped by shipping the
+  next versionCode forward.
 
-| Secret | For |
-|---|---|
-| `SUPABASE_ACCESS_TOKEN` | CLI auth for db push / functions deploy |
-| `STAGING_SUPABASE_PROJECT_REF`, `STAGING_SUPABASE_DB_PASSWORD`, `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY` | staging project |
-| `PROD_SUPABASE_PROJECT_REF`, `PROD_SUPABASE_DB_PASSWORD`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY` | production project |
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Pages deploy + rollback |
-| `ADMIN_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` | admin monitoring + source maps |
+---
 
-**Variables** (non-secret): `CF_PAGES_PROJECT_STAGING`, `CF_PAGES_PROJECT_PROD`.
+## Secrets
 
-**Edge Function secrets** (set per project with `supabase secrets set`): `SENTRY_DSN`,
-`SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
-`NOTIFY_WEBHOOK_SECRET`, `DEBUG_ERROR_SECRET`.
+Backend secrets live in `/home/birhan/birhan-backend/.env` **on the server only**
+(not in the repo). The keys that matter: `DATABASE_URL`, `BETTER_AUTH_SECRET`,
+`JWT_SECRET`, the `S3_*` set (MinIO), the `TELEGRAM_*` set, the `MAIL_*`/`EMAIL_*`
+set, `CORS_ORIGINS`, `PUBLIC_API_URL`. Changing one means editing `.env` and
+`systemctl restart birhan-api.service`. Keep a dated `.env.bak-*` beside it (the
+convention already on the box).
 
-**GitHub Environments** (Settings → Environments): create `staging` and `production`;
-add **required reviewers** to `production` (this is the manual-approval gate).
+Admin build needs `VITE_API_URL`. Mobile build needs `EXPO_PUBLIC_SENTRY_DSN` in
+the repo `.env` and `SENTRY_AUTH_TOKEN` in the environment for source-map upload.
 
-One-time: **baseline the prod migration history** (`supabase/MIGRATIONS.md`), point
-`admin.birhan.cc` / `admin-staging.birhan.cc` DNS at the Cloudflare Pages projects,
-and confirm daily DB backups are on (Supabase Pro).
+---
+
+## Monitoring
+
+Sentry org **`ghost-team-21`**, EU region (`de.sentry.io`): projects
+**`birhan-mobile`** and **`admin-web`**. Symbolicated mobile crashes require the
+release's source maps to have uploaded at build time. See `docs/MONITORING.md`.
+
+---
+
+> **Stale artifacts — do not trust:** `scripts/rollback.sh` and the comments in
+> `deploy/nginx/*.conf` still describe a Supabase + Cloudflare Pages pipeline that
+> was never how this deployed. They are historical noise; this file is the source
+> of truth.
