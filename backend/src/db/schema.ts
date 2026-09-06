@@ -321,6 +321,23 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   index("password_reset_tokens_user_created_idx").on(table.userId, table.createdAt),
 ]);
 
+/**
+ * Expo push tokens — one row per device install, `token` globally unique so a
+ * phone that changes accounts moves the token to the new user rather than
+ * notifying the old one. Read by the announcement fanout to reach every member
+ * of a church. Cascades away with the user.
+ */
+export const pushTokens = pgTable("push_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  platform: text("platform"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("push_tokens_user_id_idx").on(table.userId),
+]);
+
 // Better Auth sessions table
 /**
  * Tokens that must stop working before they expire on their own.

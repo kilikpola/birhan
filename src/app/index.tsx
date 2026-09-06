@@ -36,6 +36,7 @@ import {
 } from '../lib/announcements';
 import { getTelegramLinkStatus, postAnnouncementToTelegram } from '../lib/telegram';
 import { getVerseOfDay, VerseOfDay } from '../lib/verseOfDay';
+import { syncDailyVerseNotifications } from '../lib/dailyVerse';
 import { searchBible, VerseResult } from '../utils/search';
 import { Icon } from '../components/icon';
 import { Cross } from '../components/cross';
@@ -126,6 +127,14 @@ export default function Today() {
       // forever when the verse fails to load and there are no announcements.
       .finally(() => { if (active) setVodSettled(true); });
     return () => { active = false; };
+  }, [bibleDb, lang]);
+
+  // Keep the daily-verse reminders scheduled ahead. The Today screen is the
+  // natural place: it opens on app launch and already holds the Bible db, so
+  // every launch rolls the window forward with the correct verse per day.
+  // Entirely local — a no-op in Expo Go or if the user turned it off.
+  useEffect(() => {
+    syncDailyVerseNotifications(bibleDb, lang);
   }, [bibleDb, lang]);
 
   // Load the real "continue reading" position saved by the Bible screen.

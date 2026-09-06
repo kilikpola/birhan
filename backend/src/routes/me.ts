@@ -7,8 +7,14 @@ import { eq } from "drizzle-orm";
 import { Errors } from "../utils/errors.js";
 import { normalizePhone } from "../utils/phone.js";
 import { deleteOwnAccount } from "../services/account-deletion.js";
+import { registerPushToken, removePushToken } from "../services/push.js";
 
 const router = new Hono();
+
+const pushTokenSchema = z.object({
+  token: z.string().min(1).max(255),
+  platform: z.enum(["ios", "android"]).optional(),
+});
 
 /**
  * Deletion takes the password again, not just a valid session.
@@ -86,6 +92,27 @@ router.patch("/", zValidator("json", patchMeSchema), async (c) => {
     .returning();
 
   return c.json(updated);
+});
+
+/**
+ * Register this device's Expo push token so the member receives their church's
+ * announcements. Scoped to the caller in the service; idempotent (upsert).
+ */
+router.post("/push-token", zValidator("json", pushTokenSchema), async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+  const body = c.req.valid("json");
+  await registerPushToken(ctx, body.token, body.platform ?? null);
+  return c.json({ status: "ok" });
+});
+
+/** Forget this device's token — sign-out, or turning announcements off. */
+router.delete("/push-token", zValidator("json", z.object({ token: z.string().min(1) })), async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+  const body = c.req.valid("json");
+  await removePushToken(ctx, body.token);
+  return c.body(null, 204);
 });
 
 /**

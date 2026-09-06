@@ -37,7 +37,7 @@ export async function truncateAll() {
   await client.exec(`
     TRUNCATE auth_accounts, auth_verifications, telegram_link_codes,
              pending_registrations, email_verification_tokens,
-             password_reset_tokens, replies,
+             password_reset_tokens, push_tokens, replies,
              announcements, resources, account_revocations, profiles,
              branches, churches, sessions, users
              RESTART IDENTITY CASCADE;

@@ -46,24 +46,27 @@ likely alongside a member account created the same way `/api/v1/auth/signup`
 does (same "everything in one transaction" concern that route already
 documents). Backend work, not a frontend one.
 
-## 3. Push notifications (`src/lib/push.ts`, `savePushToken`)
+## 3. Push notifications — BUILT (backend), dormant on delivery
 
-Calling it throws `Error('Push notifications are not available yet — see
-docs/KNOWN_GAPS.md')`. Callers already treat this as non-fatal — it's caught
-and reported, never blocks the app.
+The backend subsystem now exists:
 
-This is the biggest gap of the three: the old system was a `push_tokens`
-table plus RLS (a member reads/writes only their own token) plus a Supabase
-Edge Function that fanned out to Expo's push API when an announcement was
-inserted. None of it exists in `backend/`:
+- `push_tokens` table (migration 0011), token globally unique so a device that
+  changes accounts re-points rather than double-subscribing.
+- `POST`/`DELETE /api/v1/me/push-token`, scoped to `ctx.userId`.
+- `services/push.ts#sendAnnouncementPush`, wired fire-and-forget into
+  `createAnnouncement`: it fans out to every member of the church (except the
+  author and the deleted) in each member's language via Expo's push API, and
+  prunes tokens Expo reports as `DeviceNotRegistered`. Never throws.
+- The app's `savePushToken` now POSTs the token instead of throwing.
 
-- No `push_tokens` (or equivalent) table in `backend/src/db/schema.ts`.
-- No route under `backend/src/routes/`.
-- No fanout trigger anywhere — announcements are created by
-  `services/announcements.ts` with nothing downstream of the insert.
+**What still blocks actual delivery (needs your accounts, not code):**
 
-**To fix:** needs a table + an authenticated route to store a member's own
-token (scoped server-side to `ctx.userId`, the way every other route already
-scopes to `ctx.churchId`), *and* a fanout step wired into
-`createAnnouncement` (or a job that polls for un-notified announcements).
-This is a real backend feature, not a migration of an existing one.
+- **EAS `projectId`** — `app.json` has none, so `getExpoPushTokenAsync` returns
+  null and no token is ever acquired. Run `eas init`.
+- **FCM credentials** for Android — an Expo project with FCM v1 (a Firebase
+  project + service-account key uploaded to Expo, or `google-services.json`).
+  Without it Expo cannot deliver to Android.
+
+Until both are set up, `push_tokens` stays empty and the fanout is a no-op —
+correct and harmless, just silent. The **daily-verse reminder** is unaffected:
+it is a local notification (`src/lib/dailyVerse.ts`) and needs none of this.

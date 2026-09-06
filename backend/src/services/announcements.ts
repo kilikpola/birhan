@@ -3,6 +3,7 @@ import { announcements, replies } from "../db/schema.js";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import type { AuthContext } from "../types/index.js";
 import { requireRole, requireAuth } from "./role-check.js";
+import { sendAnnouncementPush } from "./push.js";
 import { Errors } from "../utils/errors.js";
 
 export async function listAnnouncements(ctx: AuthContext, cursor?: string, limit = 20) {
@@ -69,6 +70,12 @@ export async function createAnnouncement(ctx: AuthContext, input: { titleAm: str
     titleEn: input.titleEn,
     body: input.body,
   }).returning();
+
+  // Fan out to members' phones. Fire-and-forget and self-contained: it never
+  // throws and never blocks this response, so a slow or down push service does
+  // not turn a successful post into a failure. No-op until devices register
+  // tokens (needs the app's EAS/FCM push setup).
+  void sendAnnouncementPush(announcement);
 
   return announcement;
 }

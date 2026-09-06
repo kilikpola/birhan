@@ -28,16 +28,18 @@ export type VerseOfDay = {
   text_am: string; text_en: string;
 };
 
-// stable day index (days since epoch) → same verse all day, rotates daily
-function todayIndex() {
-  const days = Math.floor(Date.now() / 86_400_000);
-  return days % VERSES.length;
+// stable day index (days since epoch) → same verse all day, rotates daily.
+// Exported so the daily-verse notification schedules the SAME verse the Today
+// screen will show on that date.
+export function verseIndexForMs(ms: number): number {
+  const days = Math.floor(ms / 86_400_000);
+  return ((days % VERSES.length) + VERSES.length) % VERSES.length;
 }
 
-export async function getVerseOfDay(
+async function resolveVerse(
   bibleDb: SQLite.SQLiteDatabase,
+  [book, chapter, verse]: [number, number, number],
 ): Promise<VerseOfDay | null> {
-  const [book, chapter, verse] = VERSES[todayIndex()];
   const row = await bibleDb.getFirstAsync<any>(
     `SELECT v.text_am, v.text_en, b.name_am, b.name_en
      FROM verses v JOIN books b ON b.id = v.book
@@ -52,4 +54,18 @@ export async function getVerseOfDay(
     text_am: row.text_am,
     text_en: row.text_en,
   };
+}
+
+export async function getVerseOfDay(
+  bibleDb: SQLite.SQLiteDatabase,
+): Promise<VerseOfDay | null> {
+  return resolveVerse(bibleDb, VERSES[verseIndexForMs(Date.now())]);
+}
+
+/** The verse for a specific calendar moment — used to schedule ahead. */
+export async function getVerseForDate(
+  bibleDb: SQLite.SQLiteDatabase,
+  date: Date,
+): Promise<VerseOfDay | null> {
+  return resolveVerse(bibleDb, VERSES[verseIndexForMs(date.getTime())]);
 }

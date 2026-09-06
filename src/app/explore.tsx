@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
 import { router, type Href } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useApp } from '@/theme/context';
@@ -15,7 +16,8 @@ import { useAuth } from '@/lib/auth';
 import { reportError } from '@/lib/errors';
 import { radius, space } from '@/theme/tokens';
 
-import { Section, Card, Row, SubLabel, ChoiceRows } from '@/components/settings/rows';
+import { Section, Card, Row, SubLabel, ChoiceRows, ToggleRow } from '@/components/settings/rows';
+import { isDailyVerseEnabled, setDailyVerseEnabled } from '@/lib/dailyVerse';
 import { AccountSection } from '@/components/settings/account-section';
 import { DataSection } from '@/components/settings/data-section';
 import { UpdateSection } from '@/components/settings/update-section';
@@ -53,6 +55,19 @@ export default function SettingsScreen() {
 
   const [showDelete, setShowDelete] = useState(false);
   const isAm = lang === 'am';
+
+  // Daily-verse reminder toggle. Defaults on; the actual scheduling (and the
+  // permission prompt) happens in setDailyVerseEnabled / the Today screen.
+  const bibleDb = useSQLiteContext();
+  const [dailyVerseOn, setDailyVerseOn] = useState(true);
+  useEffect(() => {
+    isDailyVerseEnabled().then(setDailyVerseOn).catch(() => {});
+  }, []);
+  const toggleDailyVerse = () => {
+    const next = !dailyVerseOn;
+    setDailyVerseOn(next);
+    setDailyVerseEnabled(next, bibleDb, lang).catch((e) => reportError(e, 'Settings.dailyVerse', lang, false));
+  };
 
   // Standing reminder for anyone who dismissed the post-signup verification
   // screen before confirming — that screen only shows once, so this is the
@@ -184,6 +199,21 @@ export default function SettingsScreen() {
             <Card c={c}>
               <SubLabel c={c} lang={lang} text={t(lang, 'readingLanguageLabel')} />
               <ChoiceRows c={c} lang={lang} selected={readingLang} options={readingOptions} onSelect={setReadingLang} />
+            </Card>
+          </Section>
+        </SectionBoundary>
+
+        <SectionBoundary name="Settings.Notifications">
+          <Section c={c} lang={lang} title={t(lang, 'sectionNotifications')}>
+            <Card c={c}>
+              <ToggleRow
+                c={c}
+                lang={lang}
+                label={t(lang, 'dailyVerseReminder')}
+                note={t(lang, 'dailyVerseReminderNote')}
+                value={dailyVerseOn}
+                onToggle={toggleDailyVerse}
+              />
             </Card>
           </Section>
         </SectionBoundary>

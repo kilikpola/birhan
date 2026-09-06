@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { reportError } from './errors';
+import { apiFetch } from './api';
 
 /**
  * Push notifications — the church loop the spec is built around:
@@ -107,19 +108,54 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 /**
- * NOT AVAILABLE YET — see docs/KNOWN_GAPS.md.
+ * Stores this device's Expo push token on the member's account so the backend
+ * announcement fanout can reach it. The server scopes the token to the caller
+ * and upserts, so re-registering the same token is harmless.
  *
- * The old `push_tokens` table and its Supabase RLS policy (a member can only
- * read/write their own token) don't exist in backend/ at all: no table, no
- * route, nothing under backend/src/ matches "push". The fanout itself — a
- * Supabase Edge Function triggered on new announcements — is gone too, with
- * no replacement. This isn't a call-site swap; it's a whole missing
- * subsystem (storage + fanout), so this fails honestly instead of being
- * built around. usePushNotifications() below already treats a failure here
- * as non-fatal — it reports and moves on, never blocking the offline Bible.
+ * `userId` is unused now — the server takes the caller from the JWT — but kept
+ * in the signature so usePushNotifications() reads unchanged.
  */
-export async function savePushToken(userId: string, token: string): Promise<void> {
-  throw new Error('Push notifications are not available yet — see docs/KNOWN_GAPS.md');
+export async function savePushToken(_userId: string, token: string): Promise<void> {
+  await apiFetch('/api/v1/me/push-token', {
+    method: 'POST',
+    body: { token, platform: Platform.OS === 'ios' ? 'ios' : 'android' },
+  });
+}
+
+/** Forget this device's token — best-effort, called on sign-out. */
+export async function deletePushToken(token: string): Promise<void> {
+  try {
+    await apiFetch('/api/v1/me/push-token', { method: 'DELETE', body: { token } });
+  } catch (err) {
+    reportError(err, 'push.delete', 'am', false);
+  }
+}
+
+/**
+ * The lazily-loaded expo-notifications module, or null when unavailable (Expo
+ * Go, or a build without it). Exposed so local-notification features (the daily
+ * verse) can reuse the same guarded loader.
+ */
+export function getNotificationsModule(): typeof import('expo-notifications') | null {
+  return getNotifications();
+}
+
+/**
+ * Ask for notification permission for LOCAL notifications (the daily verse).
+ * Unlike push, this does not need a real device or an EAS projectId — local
+ * notifications fire on emulators too — so it only gates on the module and the
+ * permission grant. Returns whether notifications may be shown.
+ */
+export async function ensureNotificationPermission(): Promise<boolean> {
+  const Notifications = getNotifications();
+  if (!Notifications) return false;
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let status = existing;
+  if (existing !== 'granted') {
+    const req = await Notifications.requestPermissionsAsync();
+    status = req.status;
+  }
+  return status === 'granted';
 }
 
 /**
