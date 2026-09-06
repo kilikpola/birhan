@@ -563,7 +563,7 @@ export default function Today() {
                     { color: c.text, fontFamily: am ? fonts.am : undefined },
                   ]}
                 >
-                  {vod ? (am ? vod.text_am : vod.text_en) : (am ? 'እግዚአብሔርም። ብርሃን ይሁን ኣለ፤ ብርሃንም ሆነ።' : 'And God said, Let there be light: and there was light.')}
+                  {vod ? (am ? vod.text_am : vod.text_en) : (am ? 'እግዚአብሔርም፦ ብርሃን ይሁን ኣለ፤ ብርሃንም ሆነ።' : 'And God said, Let there be light: and there was light.')}
                 </Text>
 
                 {am && (

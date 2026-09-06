@@ -89,8 +89,8 @@ function BibleLibrary({ children }: { children: React.ReactNode }) {
       }
     >
       <SQLiteProvider
-        databaseName="bible_v3.db"
-        assetSource={{ assetId: require('@/assets/bible_v3.db') }}
+        databaseName="bible_v4.db"
+        assetSource={{ assetId: require('@/assets/bible_v4.db') }}
         useSuspense
       >
         {children}
