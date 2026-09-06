@@ -62,6 +62,8 @@ export type Branch = {
   id: string;
   nameAm: string;
   nameEn: string;
+  /** null → a mother (top-level) branch; a mother's id → a child branch. */
+  parentBranchId: string | null;
   createdAt: string;
 };
 

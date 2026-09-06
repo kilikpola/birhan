@@ -726,3 +726,59 @@ body {
   background: var(--surface-alt); border:1px solid var(--border);
   padding:2px 10px; border-radius:999px;
 }
+
+/* ---- Branch hierarchy: add form + mother/child list ---- */
+.branch-form {
+  background:var(--surface); border:1px solid var(--border); border-radius:13px;
+  padding:16px; margin-bottom:14px; box-shadow:var(--shadow-sm);
+  display:flex; flex-direction:column; gap:12px; max-width:520px;
+}
+.branch-kind-label {
+  font-size:12px; font-weight:600; color:var(--text-soft);
+  text-transform:uppercase; letter-spacing:.06em;
+}
+.branch-kind { display:flex; gap:10px; flex-wrap:wrap; }
+.kind-opt {
+  flex:1 1 200px; display:flex; align-items:flex-start; gap:10px;
+  padding:11px 13px; border:1px solid var(--border); border-radius:11px;
+  cursor:pointer; background:var(--bg-2); transition:border-color .15s, background .15s;
+}
+.kind-opt.on { border-color:var(--accent); background:var(--accent-glow); }
+.kind-opt.disabled { opacity:.5; cursor:not-allowed; }
+.kind-opt input { width:auto; margin:2px 0 0; accent-color:var(--accent); }
+.kind-opt span { display:flex; flex-direction:column; gap:2px; }
+.kind-opt b { font-size:14px; }
+.kind-opt small { color:var(--text-faint); font-size:12px; }
+.branch-form select { max-width:100%; }
+.branch-form-actions { display:flex; gap:10px; justify-content:flex-end; }
+
+.branch-list { display:flex; flex-direction:column; gap:10px; }
+.branch-group {
+  border:1px solid var(--border); border-radius:13px; background:var(--surface);
+  box-shadow:var(--shadow-sm); overflow:hidden;
+}
+.branch-node {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 15px;
+}
+.branch-node.child {
+  padding-left:30px; border-top:1px solid var(--border);
+  background:color-mix(in srgb, var(--surface-alt) 40%, transparent);
+  position:relative;
+}
+.branch-node.child::before {
+  content:""; position:absolute; left:15px; top:50%; width:8px; height:1px;
+  background:var(--border-lit);
+}
+.branch-node-name { display:flex; align-items:center; gap:9px; font-size:14.5px; }
+.branch-node-name .serif { font-family:var(--serif); }
+.branch-node-meta { display:flex; align-items:center; gap:10px; }
+.branch-del {
+  border:1px solid var(--border); background:transparent; color:var(--text-faint);
+  width:28px; height:28px; border-radius:8px; font-size:13px; line-height:1;
+  display:grid; place-items:center; transition:color .15s, border-color .15s, background .15s;
+}
+.branch-del:hover {
+  color:var(--danger); border-color:color-mix(in srgb, var(--danger) 50%, transparent);
+  background:color-mix(in srgb, var(--danger) 12%, transparent);
+}

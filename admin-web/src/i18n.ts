@@ -117,6 +117,21 @@ const am: Record<string, string> = {
   joinedAgo: 'የተቀላቀለው %s',
   requestedAgo: 'የጠየቀው %s',
   memberOne: 'አባል',
+  branchKind: 'የቅርንጫፍ ዓይነት',
+  branchMother: 'እናት ቅርንጫፍ',
+  branchChild: 'ንዑስ ቅርንጫፍ',
+  branchMotherHint: 'ራሱን የቻለ ዋና ቅርንጫፍ',
+  branchChildHint: 'በአንድ እናት ቅርንጫፍ ስር',
+  branchParent: 'እናት ቅርንጫፍ',
+  branchNoMothers: 'መጀመሪያ እናት ቅርንጫፍ ይጨምሩ',
+  deleteBranch: 'ቅርንጫፍ ሰርዝ',
+  deleteBranchTitle: '“%s”ን ሰርዝ?',
+  deleteBranchPeople: '%s ሰዎች ወደ ማንም ቅርንጫፍ ይዛወራሉ፤ በመተግበሪያው ውስጥ አዲስ ቅርንጫፍ መምረጥ ይችላሉ።',
+  deleteBranchEmpty: 'ይህ ቅርንጫፍ ማንም የለውም። ሊሰረዝ ነው።',
+  deleteBranchHasChildren: 'መጀመሪያ ንዑስ ቅርንጫፎቹን ይሰርዙ ወይም ያንቀሳቅሱ።',
+  confirmDeleteBranch: 'ሰርዝ አረጋግጥ',
+  motherLabel: 'እናት',
+  childrenCount: '%s ንዑስ',
 };
 
 const en: Record<string, string> = {
@@ -227,6 +242,21 @@ const en: Record<string, string> = {
   joinedAgo: 'joined %s',
   requestedAgo: 'requested %s',
   memberOne: 'member',
+  branchKind: 'Branch type',
+  branchMother: 'Mother branch',
+  branchChild: 'Child branch',
+  branchMotherHint: 'A top-level branch of its own',
+  branchChildHint: 'Sits under a mother branch',
+  branchParent: 'Mother branch',
+  branchNoMothers: 'Add a mother branch first',
+  deleteBranch: 'Delete branch',
+  deleteBranchTitle: 'Delete “%s”?',
+  deleteBranchPeople: '%s people will be moved to no branch — they can pick a new one in the app.',
+  deleteBranchEmpty: 'No one is on this branch. It will be removed.',
+  deleteBranchHasChildren: 'Delete or move its child branches first.',
+  confirmDeleteBranch: 'Delete branch',
+  motherLabel: 'mother',
+  childrenCount: '%s child',
 };
 
 export type Lang = 'am' | 'en';

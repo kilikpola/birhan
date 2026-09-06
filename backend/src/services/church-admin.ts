@@ -1,5 +1,5 @@
 import { db } from "../db/index.js";
-import { profiles, branches, churches, users } from "../db/schema.js";
+import { profiles, branches, churches, users, resources } from "../db/schema.js";
 import { and, eq, isNull, asc } from "drizzle-orm";
 import type { AuthContext } from "../types/index.js";
 import { requireAuth, requireRole } from "./role-check.js";
@@ -94,6 +94,7 @@ export async function listChurchBranches(ctx: AuthContext, churchId: string) {
     id: branches.id,
     nameAm: branches.nameAm,
     nameEn: branches.nameEn,
+    parentBranchId: branches.parentBranchId,
     createdAt: branches.createdAt,
   })
     .from(branches)
@@ -104,7 +105,7 @@ export async function listChurchBranches(ctx: AuthContext, churchId: string) {
 export async function addBranchToChurch(
   ctx: AuthContext,
   churchId: string,
-  input: { nameAm: string; nameEn: string },
+  input: { nameAm: string; nameEn: string; parentBranchId?: string | null },
 ) {
   requireAuth(ctx);
   requireRole(ctx, ["super_admin"]);
@@ -114,6 +115,21 @@ export async function addBranchToChurch(
 
   const nameEn = input.nameEn.trim();
   const nameAm = input.nameAm.trim();
+
+  // A child must hang off a real mother of the same church — and only a mother.
+  // Two levels: a branch that already has a parent cannot become one, or the
+  // tree would deepen past what the app knows how to show.
+  let parentBranchId: string | null = null;
+  if (input.parentBranchId) {
+    const parent = await db.query.branches.findFirst({
+      where: and(eq(branches.id, input.parentBranchId), eq(branches.churchId, churchId)),
+    });
+    if (!parent) throw Errors.validation("The mother branch does not belong to this church");
+    if (parent.parentBranchId) {
+      throw Errors.validation("A child branch cannot be a mother — pick a top-level branch");
+    }
+    parentBranchId = parent.id;
+  }
 
   // A church's branch names are its own namespace; a duplicate is almost always
   // a double-submit, and the promote flow already treats same-name as the same
@@ -127,10 +143,48 @@ export async function addBranchToChurch(
     churchId,
     nameAm: nameAm || nameEn,
     nameEn,
+    parentBranchId,
     createdBy: ctx.userId,
   }).returning();
 
   return branch;
+}
+
+/**
+ * Delete a branch. People and resources on it are detached (branch → none)
+ * rather than deleted — a member outlives a branch, and the app then lets them
+ * pick a new branch. A mother that still has child branches is refused: deleting
+ * it would orphan them, so the child branches must be handled first.
+ */
+export async function deleteBranch(ctx: AuthContext, churchId: string, branchId: string) {
+  requireAuth(ctx);
+  requireRole(ctx, ["super_admin"]);
+
+  const branch = await db.query.branches.findFirst({
+    where: and(eq(branches.id, branchId), eq(branches.churchId, churchId)),
+  });
+  if (!branch) throw Errors.notFound("Branch not found");
+
+  const child = await db.query.branches.findFirst({
+    where: eq(branches.parentBranchId, branchId),
+  });
+  if (child) throw Errors.conflict("Delete or move its child branches first");
+
+  return db.transaction(async (tx) => {
+    // Detach dependents; both FKs are RESTRICT, so this must precede the delete.
+    const detached = await tx.update(profiles)
+      .set({ branchId: null })
+      .where(eq(profiles.branchId, branchId))
+      .returning({ id: profiles.id });
+
+    await tx.update(resources)
+      .set({ branchId: null })
+      .where(eq(resources.branchId, branchId));
+
+    await tx.delete(branches).where(eq(branches.id, branchId));
+
+    return { deletedId: branchId, detachedPeople: detached.length };
+  });
 }
 
 /**

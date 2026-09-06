@@ -26,12 +26,18 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
   // Add-branch inline form
   const [addingBranch, setAddingBranch] = useState(false);
   const [branchName, setBranchName] = useState('');
+  const [branchKind, setBranchKind] = useState<'mother' | 'child'>('mother');
+  const [branchParentId, setBranchParentId] = useState('');
   const [branchBusy, setBranchBusy] = useState(false);
 
   // Row action state
   const [busyId, setBusyId] = useState<string | null>(null);
   const [promoting, setPromoting] = useState<ChurchPerson | null>(null);
   const [removing, setRemoving] = useState<ChurchPerson | null>(null);
+  const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const mothers = branches.filter((b) => !b.parentBranchId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,22 +57,50 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
 
   useEffect(() => { load(); }, [load]);
 
+  const resetBranchForm = () => {
+    setAddingBranch(false);
+    setBranchName('');
+    setBranchKind('mother');
+    setBranchParentId('');
+  };
+
   const addBranch = async () => {
     const name = branchName.trim();
     if (!name) return;
+    // A child must name its mother.
+    if (branchKind === 'child' && !branchParentId) return;
     setBranchBusy(true);
     try {
       await apiFetch(`/api/v1/admin/churches/${church.id}/branches`, {
         method: 'POST',
-        body: { nameEn: name, nameAm: name },
+        body: {
+          nameEn: name,
+          nameAm: name,
+          ...(branchKind === 'child' ? { parentBranchId: branchParentId } : {}),
+        },
       });
-      setBranchName('');
-      setAddingBranch(false);
+      resetBranchForm();
       await load();
     } catch (e: any) {
       alert(t(lang, 'couldNotLoad') + ': ' + (e?.message ?? String(e)));
     } finally {
       setBranchBusy(false);
+    }
+  };
+
+  const confirmDeleteBranch = async () => {
+    if (!deletingBranch) return;
+    setDeleteBusy(true);
+    try {
+      await apiFetch(`/api/v1/admin/churches/${church.id}/branches/${deletingBranch.id}`, {
+        method: 'DELETE',
+      });
+      setDeletingBranch(null);
+      await load();
+    } catch (e: any) {
+      alert(e?.message ?? String(e));
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -136,7 +170,7 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
       </div>
 
       {addingBranch && (
-        <div className="row" style={{ gridTemplateColumns: '1fr auto auto', marginBottom: 12 }}>
+        <div className="branch-form">
           <input
             autoFocus
             placeholder={t(lang, 'branchNameEn')}
@@ -144,18 +178,40 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
             onChange={(e) => setBranchName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') addBranch(); }}
           />
-          <button className="btn btn-good" style={{ width: 'auto' }} onClick={addBranch} disabled={branchBusy || !branchName.trim()}>
-            {branchBusy ? t(lang, 'adding') : t(lang, 'add')}
-          </button>
-          <button className="btn btn-ghost" style={{ width: 'auto' }} onClick={() => { setAddingBranch(false); setBranchName(''); }}>
-            {t(lang, 'cancel')}
-          </button>
+          <div className="branch-kind-label">{t(lang, 'branchKind')}</div>
+          <div className="branch-kind">
+            <label className={'kind-opt' + (branchKind === 'mother' ? ' on' : '')}>
+              <input type="radio" name="branchKind" checked={branchKind === 'mother'} onChange={() => setBranchKind('mother')} />
+              <span><b>{t(lang, 'branchMother')}</b><small>{t(lang, 'branchMotherHint')}</small></span>
+            </label>
+            <label className={'kind-opt' + (branchKind === 'child' ? ' on' : '') + (mothers.length === 0 ? ' disabled' : '')}>
+              <input type="radio" name="branchKind" checked={branchKind === 'child'} disabled={mothers.length === 0} onChange={() => setBranchKind('child')} />
+              <span><b>{t(lang, 'branchChild')}</b><small>{mothers.length === 0 ? t(lang, 'branchNoMothers') : t(lang, 'branchChildHint')}</small></span>
+            </label>
+          </div>
+          {branchKind === 'child' && mothers.length > 0 && (
+            <select value={branchParentId} onChange={(e) => setBranchParentId(e.target.value)}>
+              <option value="">— {t(lang, 'branchParent')} —</option>
+              {mothers.map((m) => <option key={m.id} value={m.id}>{m.nameEn}</option>)}
+            </select>
+          )}
+          <div className="branch-form-actions">
+            <button className="btn btn-ghost" style={{ width: 'auto' }} onClick={resetBranchForm}>{t(lang, 'cancel')}</button>
+            <button
+              className="btn btn-good"
+              style={{ width: 'auto' }}
+              onClick={addBranch}
+              disabled={branchBusy || !branchName.trim() || (branchKind === 'child' && !branchParentId)}
+            >
+              {branchBusy ? t(lang, 'adding') : t(lang, 'add')}
+            </button>
+          </div>
         </div>
       )}
 
       {loading ? (
         <div className="branch-chips" aria-hidden>
-          {[80, 64, 96].map((w, i) => (
+          {[120, 90, 140].map((w, i) => (
             <span className="chip shimmer" key={i} style={{ width: w, color: 'transparent', borderColor: 'transparent' }}>·</span>
           ))}
         </div>
@@ -165,10 +221,36 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
           {t(lang, 'noBranchesYet')}
         </div>
       ) : (
-        <div className="branch-chips">
-          {branches.map((b) => (
-            <span className="chip role dot" key={b.id}>{b.nameEn}</span>
-          ))}
+        <div className="branch-list">
+          {mothers.map((m) => {
+            const kids = branches.filter((b) => b.parentBranchId === m.id);
+            const renderNode = (b: Branch, isMother: boolean, childCount: number) => {
+              const peopleOn = people.filter((p) => p.branchId === b.id).length;
+              return (
+                <div className={'branch-node' + (isMother ? '' : ' child')} key={b.id}>
+                  <div className="branch-node-name">
+                    <span className="serif">{b.nameEn}</span>
+                    {isMother && childCount > 0 && <span className="chip role">{t(lang, 'motherLabel')}</span>}
+                  </div>
+                  <div className="branch-node-meta">
+                    {peopleOn > 0 ? <span className="chip tnum">{peopleOn} {t(lang, 'peopleTitle')}</span> : null}
+                    <button
+                      className="branch-del"
+                      title={t(lang, 'deleteBranch')}
+                      aria-label={t(lang, 'deleteBranch')}
+                      onClick={() => setDeletingBranch(b)}
+                    >✕</button>
+                  </div>
+                </div>
+              );
+            };
+            return (
+              <div className="branch-group" key={m.id}>
+                {renderNode(m, true, kids.length)}
+                {kids.map((k) => renderNode(k, false, 0))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -257,6 +339,35 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
           </div>
         </div>
       )}
+
+      {deletingBranch && (() => {
+        const kids = branches.filter((b) => b.parentBranchId === deletingBranch.id).length;
+        const peopleOn = people.filter((p) => p.branchId === deletingBranch.id).length;
+        return (
+          <div className="modal-back" onClick={() => setDeletingBranch(null)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>{t(lang, 'deleteBranchTitle').replace('%s', deletingBranch.nameEn)}</h3>
+              <p>
+                {kids > 0
+                  ? t(lang, 'deleteBranchHasChildren')
+                  : peopleOn > 0
+                    ? t(lang, 'deleteBranchPeople').replace('%s', String(peopleOn))
+                    : t(lang, 'deleteBranchEmpty')}
+              </p>
+              <div className="modal-actions">
+                <button className="btn btn-ghost" onClick={() => setDeletingBranch(null)}>{t(lang, 'cancel')}</button>
+                <button
+                  className="btn btn-bad"
+                  onClick={confirmDeleteBranch}
+                  disabled={deleteBusy || kids > 0}
+                >
+                  {t(lang, 'confirmDeleteBranch')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -21,6 +21,7 @@ const {
   makePastor,
   removePastor,
   addBranchToChurch,
+  deleteBranch,
   listChurchPeople,
   listChurchBranches,
 } = await import("../src/services/church-admin.js");
@@ -81,6 +82,58 @@ describe("addBranchToChurch", () => {
   it("404s for a church that does not exist", async () => {
     await expect(addBranchToChurch(superCtx, otherChurchId.replace(/./, "0"), { nameEn: "X", nameAm: "X" }))
       .rejects.toBeTruthy();
+  });
+});
+
+describe("branch hierarchy (mother / child)", () => {
+  it("adds a child under a mother", async () => {
+    const mother = await addBranchToChurch(superCtx, churchId, { nameEn: "Main", nameAm: "ዋና" });
+    expect(mother.parentBranchId).toBeNull();
+    const child = await addBranchToChurch(superCtx, churchId, { nameEn: "Youth", nameAm: "ወጣት", parentBranchId: mother.id });
+    expect(child.parentBranchId).toBe(mother.id);
+  });
+
+  it("refuses a child under another church's branch", async () => {
+    const foreign = await addBranchToChurch(superCtx, otherChurchId, { nameEn: "Main", nameAm: "Main" });
+    await expect(addBranchToChurch(superCtx, churchId, { nameEn: "Youth", nameAm: "Youth", parentBranchId: foreign.id }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it("refuses nesting a child under a child (two levels only)", async () => {
+    const mother = await addBranchToChurch(superCtx, churchId, { nameEn: "Main", nameAm: "Main" });
+    const child = await addBranchToChurch(superCtx, churchId, { nameEn: "Youth", nameAm: "Youth", parentBranchId: mother.id });
+    await expect(addBranchToChurch(superCtx, churchId, { nameEn: "Teens", nameAm: "Teens", parentBranchId: child.id }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("deleteBranch", () => {
+  it("deletes a branch and detaches the people on it", async () => {
+    const branch = await addBranchToChurch(superCtx, churchId, { nameEn: "Main", nameAm: "ዋና" });
+    const memberId = await seedUser("On Branch", churchId, "member");
+    await db.update(schema.profiles).set({ branchId: branch.id }).where(eq(schema.profiles.id, memberId));
+
+    const res = await deleteBranch(superCtx, churchId, branch.id);
+    expect(res).toMatchObject({ deletedId: branch.id, detachedPeople: 1 });
+
+    const gone = await db.query.branches.findFirst({ where: eq(schema.branches.id, branch.id) });
+    expect(gone).toBeUndefined();
+    const person = await db.query.profiles.findFirst({ where: eq(schema.profiles.id, memberId) });
+    expect(person?.branchId).toBeNull();
+  });
+
+  it("refuses to delete a mother that still has child branches", async () => {
+    const mother = await addBranchToChurch(superCtx, churchId, { nameEn: "Main", nameAm: "Main" });
+    await addBranchToChurch(superCtx, churchId, { nameEn: "Youth", nameAm: "Youth", parentBranchId: mother.id });
+    await expect(deleteBranch(superCtx, churchId, mother.id)).rejects.toMatchObject({ status: 409 });
+    // Still there.
+    const still = await db.query.branches.findFirst({ where: eq(schema.branches.id, mother.id) });
+    expect(still).toBeTruthy();
+  });
+
+  it("404s deleting a branch from the wrong church", async () => {
+    const foreign = await addBranchToChurch(superCtx, otherChurchId, { nameEn: "Main", nameAm: "Main" });
+    await expect(deleteBranch(superCtx, churchId, foreign.id)).rejects.toMatchObject({ status: 404 });
   });
 });
 

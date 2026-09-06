@@ -18,6 +18,7 @@ import {
   listChurchPeople,
   listChurchBranches,
   addBranchToChurch,
+  deleteBranch,
   makePastor,
   removePastor,
 } from "../services/church-admin.js";
@@ -61,6 +62,8 @@ const branchChoiceSchema = z.object({
 const addBranchSchema = z.object({
   nameAm: z.string().trim().min(1).max(200),
   nameEn: z.string().trim().min(1).max(200),
+  /** Present → this is a child of that mother branch. Absent → a mother branch. */
+  parentBranchId: z.string().uuid().optional(),
 });
 
 /**
@@ -163,6 +166,14 @@ router.post("/churches/:churchId/branches", zValidator("json", addBranchSchema),
   const body = c.req.valid("json");
   const branch = await addBranchToChurch(ctx, churchId, body);
   return c.json(branch, 201);
+});
+
+router.delete("/churches/:churchId/branches/:branchId", async (c) => {
+  const ctx = c.get("authContext");
+  const churchId = c.req.param("churchId");
+  const branchId = c.req.param("branchId");
+  const result = await deleteBranch(ctx, churchId, branchId);
+  return c.json(result);
 });
 
 router.post("/people/:id/make-pastor", async (c) => {

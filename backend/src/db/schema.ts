@@ -25,10 +25,17 @@ export const branches = pgTable("branches", {
   churchId: uuid("church_id").notNull().references(() => churches.id, { onDelete: "cascade" }),
   nameAm: text("name_am").notNull(),
   nameEn: text("name_en").notNull(),
+  /**
+   * NULL for a "mother" (top-level) branch; the mother's id for a "child".
+   * Two levels only — a child may not itself be a parent. Enforced in the
+   * service (addBranchToChurch), not by the column.
+   */
+  parentBranchId: uuid("parent_branch_id").references((): AnyPgColumn => branches.id),
   createdBy: uuid("created_by").references((): AnyPgColumn => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("branches_church_id_idx").on(table.churchId),
+  index("branches_parent_branch_id_idx").on(table.parentBranchId),
 ]);
 
 export const profiles = pgTable("profiles", {
