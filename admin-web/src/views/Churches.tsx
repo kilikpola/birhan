@@ -3,6 +3,8 @@ import { apiFetch } from '../api';
 import type { Church } from '../types';
 import { useI18n, t } from '../i18n';
 import { ChurchDetail } from './ChurchDetail';
+import { Avatar } from '../components/Avatar';
+import { SkeletonRows } from '../components/Skeleton';
 
 export function Churches() {
   const { lang } = useI18n();
@@ -58,31 +60,36 @@ export function Churches() {
       {err && <div className="banner">{t(lang, 'couldNotLoad')}: {err}</div>}
 
       {loading ? (
-        <div className="loading">{t(lang, 'loading')}</div>
+        <SkeletonRows n={6} />
       ) : filtered.length === 0 ? (
-        <div className="empty">{t(lang, 'noChurches').replace('%s', q)}</div>
+        <div className="empty">
+          <span className="empty-ico" aria-hidden>⛪</span>
+          {t(lang, 'noChurches').replace('%s', q)}
+        </div>
       ) : (
         <div className="rows">
           {filtered.map((c) => (
             <div
               className="row"
               key={c.id}
-              style={{ cursor: 'pointer' }}
               role="button"
               tabIndex={0}
               onClick={() => setSelected(c)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(c); } }}
             >
-              <div>
-                <div className="who-name serif">{c.nameAm}</div>
-                <div className="who-meta">
-                  <b>{c.nameEn}</b>
-                  {c.denomination ? ` · ${c.denomination}` : ''}
-                  {c.city ? ` · ${c.city}` : ''}
+              <div className="who">
+                <Avatar name={c.nameEn || c.nameAm} square />
+                <div className="who-body">
+                  <div className="who-name serif">{c.nameAm}</div>
+                  <div className="who-meta">
+                    <b>{c.nameEn}</b>
+                    {c.denomination ? <span>· {c.denomination}</span> : null}
+                    {c.city ? <span>· {c.city}</span> : null}
+                  </div>
                 </div>
               </div>
               <div className="row-actions">
-                {c.telegramChatId ? <span className="chip approved">{t(lang, 'telegramLinked')}</span> : null}
+                {c.telegramChatId ? <span className="chip approved dot">{t(lang, 'telegramLinked')}</span> : null}
                 <span className="chip role tnum">{c.memberCount} {t(lang, 'memberCount')}</span>
                 <span className="chip" aria-hidden>›</span>
               </div>

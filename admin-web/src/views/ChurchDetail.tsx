@@ -3,6 +3,9 @@ import { apiFetch } from '../api';
 import type { Branch, Church, ChurchPerson, BranchChoice, Role } from '../types';
 import { useI18n, t } from '../i18n';
 import { BranchChoiceModal } from '../components/BranchChoiceModal';
+import { Avatar } from '../components/Avatar';
+import { SkeletonRows } from '../components/Skeleton';
+import { timeAgo } from '../lib/format';
 
 const ROLE_KEY: Record<Role, string> = {
   member: 'roleLabelMember',
@@ -151,13 +154,20 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
       )}
 
       {loading ? (
-        <div className="loading">{t(lang, 'loading')}</div>
+        <div className="branch-chips" aria-hidden>
+          {[80, 64, 96].map((w, i) => (
+            <span className="chip shimmer" key={i} style={{ width: w, color: 'transparent', borderColor: 'transparent' }}>·</span>
+          ))}
+        </div>
       ) : branches.length === 0 ? (
-        <div className="empty">{t(lang, 'noBranchesYet')}</div>
+        <div className="empty" style={{ padding: '30px 20px' }}>
+          <span className="empty-ico" aria-hidden>🌿</span>
+          {t(lang, 'noBranchesYet')}
+        </div>
       ) : (
         <div className="branch-chips">
           {branches.map((b) => (
-            <span className="chip role" key={b.id}>{b.nameEn}</span>
+            <span className="chip role dot" key={b.id}>{b.nameEn}</span>
           ))}
         </div>
       )}
@@ -178,29 +188,33 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
       )}
 
       {loading ? (
-        <div className="loading">{t(lang, 'loading')}</div>
+        <SkeletonRows n={4} />
       ) : filtered.length === 0 ? (
         <div className="empty">
+          <span className="empty-ico" aria-hidden>🙋</span>
           {q.trim() ? t(lang, 'noPeopleMatch').replace('%s', q) : t(lang, 'noPeopleYet')}
         </div>
       ) : (
         <div className="rows">
           {filtered.map((p) => {
             const isAdmin = p.role === 'admin' || p.role === 'super_admin';
+            const roleClass = p.role === 'pastor' ? 'approved' : p.role === 'pending_pastor' ? 'pending' : 'role';
             return (
               <div className="row" key={p.id}>
-                <div>
-                  <div className="who-name">{p.displayName}</div>
-                  <div className="who-meta">
-                    {p.branchName ? <b>{p.branchName}</b> : ''}
-                    {p.churchRole ? `${p.branchName ? ' · ' : ''}${p.churchRole}` : ''}
-                    {p.email ? ` · ${p.email}` : ''}
+                <div className="who">
+                  <Avatar name={p.displayName} />
+                  <div className="who-body">
+                    <div className="who-name">{p.displayName}</div>
+                    <div className="who-meta">
+                      {p.branchName ? <b>{p.branchName}</b> : null}
+                      {p.churchRole ? <span>· {p.churchRole}</span> : null}
+                      {p.email ? <span>· {p.email}</span> : null}
+                      {p.createdAt ? <span>· {t(lang, 'joinedAgo').replace('%s', timeAgo(p.createdAt, lang))}</span> : null}
+                    </div>
                   </div>
                 </div>
                 <div className="row-actions">
-                  <span className={'chip ' + (p.role === 'pastor' ? 'approved' : p.role === 'pending_pastor' ? 'pending' : 'role')}>
-                    {t(lang, ROLE_KEY[p.role])}
-                  </span>
+                  <span className={'chip dot ' + roleClass}>{t(lang, ROLE_KEY[p.role])}</span>
                   {isAdmin ? null : p.role === 'pastor' ? (
                     <button className="btn btn-bad" style={{ width: 'auto' }} onClick={() => setRemoving(p)} disabled={busyId === p.id}>
                       {t(lang, 'removePastor')}

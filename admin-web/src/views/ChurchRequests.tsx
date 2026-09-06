@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../api';
 import type { ChurchRequest, RequestStatus } from '../types';
 import { useI18n, t } from '../i18n';
+import { Avatar } from '../components/Avatar';
+import { SkeletonRows } from '../components/Skeleton';
+import { timeAgo } from '../lib/format';
 
 type Filter = RequestStatus;
 
@@ -93,26 +96,32 @@ export function ChurchRequests({ onCountChange }: { onCountChange?: (pending: nu
       {err && <div className="banner">{t(lang, 'couldNotLoad')}: {err}</div>}
 
       {loading ? (
-        <div className="loading">{t(lang, 'loading')}</div>
+        <SkeletonRows n={4} />
       ) : rows.length === 0 ? (
-        <div className="empty">{t(lang, 'nothingHere')}</div>
+        <div className="empty">
+          <span className="empty-ico" aria-hidden>{filter === 'pending' ? '📨' : '📭'}</span>
+          {t(lang, 'nothingHere')}
+        </div>
       ) : (
         <div className="rows">
           {rows.map((r) => (
             <div className="row" key={r.id}>
-              <div>
-                <div className="who-name serif">{r.nameEn}</div>
-                <div className="who-meta">
-                  {r.nameAm ? `${r.nameAm} · ` : ''}
-                  {r.city ? `${r.city} · ` : ''}
-                  {r.denomination ? `${r.denomination} · ` : ''}
-                  {t(lang, 'requestedBy')} <b>{r.requesterName ?? '—'}</b>
-                  {` · ${new Date(r.createdAt).toLocaleDateString()}`}
-                  {r.status === 'rejected' && r.rejectedReason ? ` · ${r.rejectedReason}` : ''}
+              <div className="who">
+                <Avatar name={r.nameEn || r.nameAm || '?'} square />
+                <div className="who-body">
+                  <div className="who-name serif">{r.nameEn}</div>
+                  <div className="who-meta">
+                    {r.nameAm ? <span>{r.nameAm} ·</span> : null}
+                    {r.city ? <span>{r.city} ·</span> : null}
+                    {r.denomination ? <span>{r.denomination} ·</span> : null}
+                    <span>{t(lang, 'requestedBy')} <b>{r.requesterName ?? '—'}</b></span>
+                    <span>· {timeAgo(r.createdAt, lang)}</span>
+                    {r.status === 'rejected' && r.rejectedReason ? <span>· {r.rejectedReason}</span> : null}
+                  </div>
                 </div>
               </div>
               <div className="row-actions">
-                <span className={'chip ' + r.status}>{t(lang, r.status)}</span>
+                <span className={'chip dot ' + r.status}>{t(lang, r.status)}</span>
                 {filter === 'pending' && (
                   <>
                     <button className="btn btn-good" onClick={() => approve(r)} disabled={busyId === r.id}>

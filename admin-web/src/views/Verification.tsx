@@ -3,6 +3,9 @@ import { apiFetch } from '../api';
 import type { PastorApplication, PastorStatus, BranchChoice } from '../types';
 import { useI18n, t } from '../i18n';
 import { BranchChoiceModal } from '../components/BranchChoiceModal';
+import { Avatar } from '../components/Avatar';
+import { SkeletonRows } from '../components/Skeleton';
+import { timeAgo } from '../lib/format';
 
 type Filter = PastorStatus;
 
@@ -110,31 +113,37 @@ export function Verification({ onCountChange }: { onCountChange?: (pending: numb
       {err && <div className="banner">{t(lang, 'couldNotLoad')}: {err}</div>}
 
       {loading ? (
-        <div className="loading">{t(lang, 'loading')}</div>
+        <SkeletonRows n={4} />
       ) : rows.length === 0 ? (
-        <div className="empty">{t(lang, 'nothingHere')}</div>
+        <div className="empty">
+          <span className="empty-ico" aria-hidden>{filter === 'pending' ? '☑️' : '📭'}</span>
+          {t(lang, 'nothingHere')}
+        </div>
       ) : (
         <div className="rows">
           {rows.map((r) => (
             <div className="row" key={r.id}>
-              <div>
-                <div className="who-name">{r.displayName}</div>
-                <div className="who-meta">
-                  <b>{r.churchName ?? 'No church'}</b>
-                  {r.branchName ? ` · ${r.branchName}` : ''}
-                  {r.pastorBranchName ? ` · ${r.pastorBranchName}` : ''}
-                  {r.churchRole ? ` · ${r.churchRole}` : ''}
-                  {r.email ? ` · ${r.email}` : ''}
-                  {r.pastorRequestedAt
-                    ? ` · ${new Date(r.pastorRequestedAt).toLocaleDateString()}`
-                    : ''}
-                  {r.pastorStatus === 'rejected' && r.pastorRejectedReason
-                    ? ` · ${r.pastorRejectedReason}`
-                    : ''}
+              <div className="who">
+                <Avatar name={r.displayName} />
+                <div className="who-body">
+                  <div className="who-name">{r.displayName}</div>
+                  <div className="who-meta">
+                    <b>{r.churchName ?? 'No church'}</b>
+                    {r.branchName ? <span>· {r.branchName}</span> : null}
+                    {r.pastorBranchName ? <span>· {r.pastorBranchName}</span> : null}
+                    {r.churchRole ? <span>· {r.churchRole}</span> : null}
+                    {r.email ? <span>· {r.email}</span> : null}
+                    {r.pastorRequestedAt
+                      ? <span>· {t(lang, 'requestedAgo').replace('%s', timeAgo(r.pastorRequestedAt, lang))}</span>
+                      : null}
+                    {r.pastorStatus === 'rejected' && r.pastorRejectedReason
+                      ? <span>· {r.pastorRejectedReason}</span>
+                      : null}
+                  </div>
                 </div>
               </div>
               <div className="row-actions">
-                <span className={'chip ' + (r.pastorStatus ?? 'pending')}>{t(lang, r.pastorStatus ?? 'pending')}</span>
+                <span className={'chip dot ' + (r.pastorStatus ?? 'pending')}>{t(lang, r.pastorStatus ?? 'pending')}</span>
                 <button className="btn btn-ghost" onClick={() => viewDoc(r)} disabled={!r.pastorDocPath}>
                   {r.pastorDocPath ? t(lang, 'viewDoc') : t(lang, 'noDoc')}
                 </button>

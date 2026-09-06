@@ -33,24 +33,39 @@ export function Dashboard({ goVerify, goRequests }: { goVerify: () => void; goRe
 
       <div className="stats">
         <div className="stat">
-          <div className="k tnum serif">{c ? c.churches : '—'}</div>
-          <div className="l">{t(lang, 'churches')}</div>
+          <span className="stat-ico" aria-hidden>⛪</span>
+          <div className="stat-body">
+            <div className="k tnum serif">{c ? c.churches : '—'}</div>
+            <div className="l">{t(lang, 'churches')}</div>
+          </div>
         </div>
         <div className="stat">
-          <div className="k tnum serif">{c ? c.members.toLocaleString() : '—'}</div>
-          <div className="l">{t(lang, 'members')}</div>
+          <span className="stat-ico" aria-hidden>👥</span>
+          <div className="stat-body">
+            <div className="k tnum serif">{c ? c.members.toLocaleString() : '—'}</div>
+            <div className="l">{t(lang, 'members')}</div>
+          </div>
         </div>
         <div className="stat">
-          <div className="k tnum serif">{c ? c.pastors : '—'}</div>
-          <div className="l">{t(lang, 'verifiedPastors')}</div>
+          <span className="stat-ico" aria-hidden>✝️</span>
+          <div className="stat-body">
+            <div className="k tnum serif">{c ? c.pastors : '—'}</div>
+            <div className="l">{t(lang, 'verifiedPastors')}</div>
+          </div>
         </div>
         <div className={'stat' + (c && c.pending > 0 ? ' alert' : '')}>
-          <div className="k tnum serif">{c ? c.pending : '—'}</div>
-          <div className="l">{t(lang, 'pendingReview')}</div>
+          <span className="stat-ico" aria-hidden>⏳</span>
+          <div className="stat-body">
+            <div className="k tnum serif">{c ? c.pending : '—'}</div>
+            <div className="l">{t(lang, 'pendingReview')}</div>
+          </div>
         </div>
         <div className={'stat' + (c && c.pendingChurchRequests > 0 ? ' alert' : '')}>
-          <div className="k tnum serif">{c ? c.pendingChurchRequests : '—'}</div>
-          <div className="l">{t(lang, 'pendingChurchRequests')}</div>
+          <span className="stat-ico" aria-hidden>📨</span>
+          <div className="stat-body">
+            <div className="k tnum serif">{c ? c.pendingChurchRequests : '—'}</div>
+            <div className="l">{t(lang, 'pendingChurchRequests')}</div>
+          </div>
         </div>
       </div>
 

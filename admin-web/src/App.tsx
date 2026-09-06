@@ -6,6 +6,7 @@ import { Verification } from './views/Verification';
 import { Churches } from './views/Churches';
 import { ChurchRequests } from './views/ChurchRequests';
 import { DebugSentry } from './views/DebugSentry';
+import { Avatar } from './components/Avatar';
 import { setMonitoringUser, clearMonitoringUser } from './monitoring';
 import { useTheme } from './theme';
 import { I18nProvider, useI18n, t, type Lang } from './i18n';
@@ -95,9 +96,12 @@ function Shell() {
         </button>
 
         <div className="side-foot">
-          <div className="who">
-            {profile?.displayName}
-            <small>{profile?.role}</small>
+          <div className="who-foot">
+            <Avatar name={profile?.displayName ?? '?'} size={36} />
+            <div className="who">
+              {profile?.displayName}
+              <small>{profile?.role}</small>
+            </div>
           </div>
           <button className="theme-toggle" onClick={() => setNight(!night)}>
             {night ? '☀️' : '🌙'} {t(lang, night ? 'dayMode' : 'nightMode')}

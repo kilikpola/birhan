@@ -108,6 +108,15 @@ const am: Record<string, string> = {
   roleLabelAdmin: 'አስተዳዳሪ',
   roleLabelSuperAdmin: 'ዋና አስተዳዳሪ',
   peopleCount: '%s ሰዎች',
+  agoJustNow: 'አሁን',
+  agoMinutes: 'ከ%s ደቂቃ በፊት',
+  agoHours: 'ከ%s ሰዓት በፊት',
+  agoDays: 'ከ%s ቀን በፊት',
+  agoWeeks: 'ከ%s ሳምንት በፊት',
+  agoMonths: 'ከ%s ወር በፊት',
+  joinedAgo: 'የተቀላቀለው %s',
+  requestedAgo: 'የጠየቀው %s',
+  memberOne: 'አባል',
 };
 
 const en: Record<string, string> = {
@@ -209,6 +218,15 @@ const en: Record<string, string> = {
   roleLabelAdmin: 'admin',
   roleLabelSuperAdmin: 'super admin',
   peopleCount: '%s people',
+  agoJustNow: 'just now',
+  agoMinutes: '%sm ago',
+  agoHours: '%sh ago',
+  agoDays: '%sd ago',
+  agoWeeks: '%sw ago',
+  agoMonths: '%smo ago',
+  joinedAgo: 'joined %s',
+  requestedAgo: 'requested %s',
+  memberOne: 'member',
 };
 
 export type Lang = 'am' | 'en';
