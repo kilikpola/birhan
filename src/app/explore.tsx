@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Pressable, Linking } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { router, type Href } from 'expo-router';
@@ -224,11 +224,16 @@ export default function SettingsScreen() {
           </Section>
         </SectionBoundary>
 
-        <SectionBoundary name="Settings.Updates">
-          <Section c={c} lang={lang} title={t(lang, 'sectionUpdates')}>
-            <UpdateSection c={c} lang={lang} />
-          </Section>
-        </SectionBoundary>
+        {/* The in-app APK updater is Android-only — iOS apps update through the
+            App Store and cannot sideload, so the whole section is hidden on iOS
+            (and App Store review would reject a self-updater). */}
+        {Platform.OS !== 'ios' && (
+          <SectionBoundary name="Settings.Updates">
+            <Section c={c} lang={lang} title={t(lang, 'sectionUpdates')}>
+              <UpdateSection c={c} lang={lang} />
+            </Section>
+          </SectionBoundary>
+        )}
 
         <SectionBoundary name="Settings.About">
           <Section c={c} lang={lang} title={t(lang, 'sectionAbout')}>
