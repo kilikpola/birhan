@@ -14,6 +14,14 @@ import {
   approveChurchRequest,
   rejectChurchRequest,
 } from "../services/admin.js";
+import {
+  listChurchPeople,
+  listChurchBranches,
+  addBranchToChurch,
+  makePastor,
+  removePastor,
+} from "../services/church-admin.js";
+import { Errors } from "../utils/errors.js";
 
 const router = new Hono();
 
@@ -38,6 +46,36 @@ function parseStatus(raw: string | undefined): ListStatus | undefined {
 }
 
 const rejectSchema = z.object({ reason: z.string().min(1) });
+
+/**
+ * A branch choice sent with approve / make-pastor. At most one of the two is
+ * meaningful; the service takes `branchId` first and treats `newBranchName` as
+ * the create path. Both optional — omitting them keeps the current branch (and,
+ * on approve, falls back to the branch the applicant claimed).
+ */
+const branchChoiceSchema = z.object({
+  branchId: z.string().uuid().optional(),
+  newBranchName: z.string().trim().min(1).max(200).optional(),
+});
+
+const addBranchSchema = z.object({
+  nameAm: z.string().trim().min(1).max(200),
+  nameEn: z.string().trim().min(1).max(200),
+});
+
+/**
+ * Parse the optional branch body from a request that may carry no body at all.
+ *
+ * The approve / make-pastor buttons POST either an empty body or a small
+ * choice. A missing body is fine (empty choice); a present-but-malformed one is
+ * a 400, not the 500 a bare ZodError would become on its way out.
+ */
+async function parseBranchChoice(c: { req: { json: () => Promise<unknown> } }) {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = branchChoiceSchema.safeParse(raw ?? {});
+  if (!parsed.success) throw Errors.validation(parsed.error.issues[0]?.message ?? "Invalid branch choice");
+  return parsed.data;
+}
 
 router.get("/stats", async (c) => {
   const ctx = c.get("authContext");
@@ -90,7 +128,8 @@ router.get("/pastor-applications/:id/document", async (c) => {
 router.post("/pastor-applications/:id/approve", async (c) => {
   const ctx = c.get("authContext");
   const userId = c.req.param("id");
-  const result = await approvePastorApplication(ctx, userId);
+  const choice = await parseBranchChoice(c);
+  const result = await approvePastorApplication(ctx, userId, choice);
   return c.json(result);
 });
 
@@ -99,6 +138,45 @@ router.post("/pastor-applications/:id/reject", zValidator("json", rejectSchema),
   const userId = c.req.param("id");
   const body = c.req.valid("json");
   const result = await rejectPastorApplication(ctx, userId, body.reason);
+  return c.json(result);
+});
+
+// --- People & branches within a church (the church drill-in) ---
+
+router.get("/churches/:churchId/people", async (c) => {
+  const ctx = c.get("authContext");
+  const churchId = c.req.param("churchId");
+  const people = await listChurchPeople(ctx, churchId);
+  return c.json({ people });
+});
+
+router.get("/churches/:churchId/branches", async (c) => {
+  const ctx = c.get("authContext");
+  const churchId = c.req.param("churchId");
+  const branches = await listChurchBranches(ctx, churchId);
+  return c.json({ branches });
+});
+
+router.post("/churches/:churchId/branches", zValidator("json", addBranchSchema), async (c) => {
+  const ctx = c.get("authContext");
+  const churchId = c.req.param("churchId");
+  const body = c.req.valid("json");
+  const branch = await addBranchToChurch(ctx, churchId, body);
+  return c.json(branch, 201);
+});
+
+router.post("/people/:id/make-pastor", async (c) => {
+  const ctx = c.get("authContext");
+  const userId = c.req.param("id");
+  const choice = await parseBranchChoice(c);
+  const result = await makePastor(ctx, userId, choice);
+  return c.json(result);
+});
+
+router.post("/people/:id/remove-pastor", async (c) => {
+  const ctx = c.get("authContext");
+  const userId = c.req.param("id");
+  const result = await removePastor(ctx, userId);
   return c.json(result);
 });
 

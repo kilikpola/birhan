@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../api';
 import type { Church } from '../types';
 import { useI18n, t } from '../i18n';
+import { ChurchDetail } from './ChurchDetail';
 
 export function Churches() {
   const { lang } = useI18n();
@@ -9,6 +10,11 @@ export function Churches() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [selected, setSelected] = useState<Church | null>(null);
+
+  if (selected) {
+    return <ChurchDetail church={selected} onBack={() => setSelected(null)} />;
+  }
 
   useEffect(() => {
     (async () => {
@@ -58,7 +64,15 @@ export function Churches() {
       ) : (
         <div className="rows">
           {filtered.map((c) => (
-            <div className="row" key={c.id}>
+            <div
+              className="row"
+              key={c.id}
+              style={{ cursor: 'pointer' }}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelected(c)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(c); } }}
+            >
               <div>
                 <div className="who-name serif">{c.nameAm}</div>
                 <div className="who-meta">
@@ -70,6 +84,7 @@ export function Churches() {
               <div className="row-actions">
                 {c.telegramChatId ? <span className="chip approved">{t(lang, 'telegramLinked')}</span> : null}
                 <span className="chip role tnum">{c.memberCount} {t(lang, 'memberCount')}</span>
+                <span className="chip" aria-hidden>›</span>
               </div>
             </div>
           ))}

@@ -3,6 +3,7 @@ import { profiles, branches, churches, users } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import type { AuthContext, PastorStatus } from "../types/index.js";
 import { requireRole, requireAuth } from "./role-check.js";
+import { resolveBranchId } from "./church-admin.js";
 import { Errors } from "../utils/errors.js";
 import {
   getPresignedUploadUrl,
@@ -121,7 +122,11 @@ export async function getPastorApplicationDocumentUrl(ctx: AuthContext, userId: 
   return { url };
 }
 
-export async function approvePastorApplication(ctx: AuthContext, userId: string) {
+export async function approvePastorApplication(
+  ctx: AuthContext,
+  userId: string,
+  choice: { branchId?: string | null; newBranchName?: string | null } = {},
+) {
   requireAuth(ctx);
   requireRole(ctx, ["super_admin"]);
 
@@ -133,13 +138,19 @@ export async function approvePastorApplication(ctx: AuthContext, userId: string)
   }
 
   // Approval closes the whole loop in one action: promote the applicant AND
-  // create the branch they said they lead, linking them to it. Without this the
-  // new pastor lands in an app where their branch does not exist and someone has
-  // to create it by hand between approval and first use.
+  // settle the branch they lead, linking them to it. Without this the new
+  // pastor lands in an app where their branch does not exist and someone has to
+  // create it by hand between approval and first use.
   return db.transaction(async (tx) => {
     let branchId = profile.branchId;
 
-    if (!branchId && profile.pastorBranchName) {
+    // The reviewer's explicit choice (an existing branch, or a new name they
+    // typed) wins over the branch the applicant claimed. Only when they leave it
+    // untouched do we fall back to the applicant's `pastorBranchName`.
+    const chosen = await resolveBranchId(tx, profile.churchId, choice, ctx.userId);
+    if (chosen) {
+      branchId = chosen;
+    } else if (!branchId && profile.pastorBranchName) {
       const name = profile.pastorBranchName.trim();
 
       // Reuse a branch of the same name rather than creating a duplicate — two
@@ -155,7 +166,7 @@ export async function approvePastorApplication(ctx: AuthContext, userId: string)
           churchId: profile.churchId,
           nameAm: name,
           nameEn: name,
-          createdBy: userId,
+          createdBy: ctx.userId,
         }).returning();
         branchId = created.id;
       }

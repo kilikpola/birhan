@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../api';
-import type { PastorApplication, PastorStatus } from '../types';
+import type { PastorApplication, PastorStatus, BranchChoice } from '../types';
 import { useI18n, t } from '../i18n';
+import { BranchChoiceModal } from '../components/BranchChoiceModal';
 
 type Filter = PastorStatus;
 
@@ -12,6 +13,7 @@ export function Verification({ onCountChange }: { onCountChange?: (pending: numb
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<PastorApplication | null>(null);
+  const [approving, setApproving] = useState<PastorApplication | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -45,10 +47,15 @@ export function Verification({ onCountChange }: { onCountChange?: (pending: numb
     }
   };
 
-  const approve = async (r: PastorApplication) => {
-    setBusyId(r.id);
+  const confirmApprove = async (choice: BranchChoice) => {
+    if (!approving) return;
+    setBusyId(approving.id);
     try {
-      await apiFetch(`/api/v1/admin/pastor-applications/${r.id}/approve`, { method: 'POST' });
+      await apiFetch(`/api/v1/admin/pastor-applications/${approving.id}/approve`, {
+        method: 'POST',
+        body: choice,
+      });
+      setApproving(null);
       load();
     } catch (e: any) {
       alert('Approve failed: ' + (e?.message ?? String(e)));
@@ -133,7 +140,7 @@ export function Verification({ onCountChange }: { onCountChange?: (pending: numb
                 </button>
                 {filter === 'pending' && (
                   <>
-                    <button className="btn btn-good" onClick={() => approve(r)} disabled={busyId === r.id}>
+                    <button className="btn btn-good" onClick={() => setApproving(r)} disabled={busyId === r.id}>
                       {t(lang, 'approve')}
                     </button>
                     <button className="btn btn-bad" onClick={() => setRejecting(r)} disabled={busyId === r.id}>
@@ -145,6 +152,20 @@ export function Verification({ onCountChange }: { onCountChange?: (pending: numb
             </div>
           ))}
         </div>
+      )}
+
+      {approving && (
+        <BranchChoiceModal
+          title={t(lang, 'makePastorTitle').replace('%s', approving.displayName)}
+          churchId={approving.churchId}
+          currentBranchId={approving.branchId}
+          keepLabel={approving.pastorBranchName
+            ? `${t(lang, 'branchNew')}: ${approving.pastorBranchName}`
+            : t(lang, 'branchKeep')}
+          busy={busyId === approving.id}
+          onCancel={() => setApproving(null)}
+          onConfirm={confirmApprove}
+        />
       )}
 
       {rejecting && (

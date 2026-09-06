@@ -57,6 +57,36 @@ export type Church = {
   createdAt: string;
 };
 
+/** Row in GET /api/v1/admin/churches/:id/branches. */
+export type Branch = {
+  id: string;
+  nameAm: string;
+  nameEn: string;
+  createdAt: string;
+};
+
+/** Row in GET /api/v1/admin/churches/:id/people. */
+export type ChurchPerson = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  role: Role;
+  churchRole: string | null;
+  branchId: string | null;
+  branchName: string | null;
+  pastorStatus: PastorStatus | null;
+  createdAt: string;
+};
+
+/**
+ * A branch choice sent to approve / make-pastor. At most one field carries
+ * meaning: an existing branch, or a name to create. Empty means "leave as is".
+ */
+export type BranchChoice = {
+  branchId?: string;
+  newBranchName?: string;
+};
+
 /** Row in GET /api/v1/admin/church-requests. */
 export type ChurchRequest = {
   id: string;
