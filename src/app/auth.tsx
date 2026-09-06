@@ -124,7 +124,45 @@ export default function Auth() {
   const [showClergyNoticeSheet, setShowClergyNoticeSheet] = useState(false);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
 
+  // Forgot-password sheet
+  const [showForgotSheet, setShowForgotSheet] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotBusy, setForgotBusy] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotErr, setForgotErr] = useState<string | null>(null);
+
   const isAm = lang === 'am';
+
+  const openForgot = useCallback(() => {
+    setForgotEmail(email.trim());
+    setForgotErr(null);
+    setForgotSent(false);
+    setShowForgotSheet(true);
+  }, [email]);
+
+  const submitForgot = useCallback(async () => {
+    const address = forgotEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(address)) {
+      setForgotErr(t(lang, 'forgotBadEmail'));
+      return;
+    }
+    setForgotBusy(true);
+    setForgotErr(null);
+    try {
+      await apiFetch('/api/v1/auth/forgot-password', {
+        method: 'POST',
+        auth: false,
+        body: { email: address },
+      });
+      setForgotSent(true);
+    } catch (e) {
+      reportError(e, 'Auth.forgotPassword', lang, false);
+      setForgotErr(t(lang, 'forgotFailed'));
+    } finally {
+      setForgotBusy(false);
+    }
+  }, [forgotEmail, lang]);
 
   // Selected object references
   const selectedChurch = churches.find((ch) => ch.id === churchId);
@@ -575,6 +613,9 @@ export default function Auth() {
               value={password}
               onChangeText={setPassword}
             />
+            <Pressable onPress={openForgot} style={{ alignSelf: 'flex-end', marginTop: -4 }} hitSlop={8}>
+              <Text style={[s.backLink, { color: c.accent }]}>{t(lang, 'forgotPassword')}</Text>
+            </Pressable>
           </View>
         )}
 
@@ -1153,6 +1194,42 @@ export default function Auth() {
         <PrimaryButton c={c} onPress={handleProceedToClergyKYC} style={{ marginTop: 16 }}>
           {isAm ? 'ወደ ማረጋገጫ ቀጥል' : 'Proceed to Verification'}
         </PrimaryButton>
+      </BottomSheet>
+
+      {/* Forgot password */}
+      <BottomSheet
+        c={c}
+        visible={showForgotSheet}
+        onClose={() => setShowForgotSheet(false)}
+        title={t(lang, 'forgotTitle')}
+        heightPct={0.5}
+      >
+        {forgotSent ? (
+          <View style={{ gap: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{t(lang, 'forgotSentTitle')}</Text>
+            <Text style={{ fontSize: 13.5, color: c.textSoft, lineHeight: 20 }}>{t(lang, 'forgotSentBody')}</Text>
+            <PrimaryButton c={c} onPress={() => setShowForgotSheet(false)} style={{ marginTop: 8 }}>
+              {t(lang, 'forgotDone')}
+            </PrimaryButton>
+          </View>
+        ) : (
+          <View style={{ gap: 14 }}>
+            <Text style={{ fontSize: 13.5, color: c.textSoft, lineHeight: 20 }}>{t(lang, 'forgotBody')}</Text>
+            <Field
+              c={c}
+              label={t(lang, 'emailLabel')}
+              placeholder="name@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              error={forgotErr ?? undefined}
+            />
+            <PrimaryButton c={c} onPress={submitForgot} disabled={forgotBusy} busy={forgotBusy} busyLabel={t(lang, 'forgotSending')}>
+              {t(lang, 'forgotSend')}
+            </PrimaryButton>
+          </View>
+        )}
       </BottomSheet>
     </SafeAreaView>
   );

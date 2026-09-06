@@ -14,6 +14,11 @@ import { optionalAuthMiddleware } from "../middleware/auth.js";
 import { logger } from "../middleware/logger.js";
 import { sendVerificationEmail } from "../services/email.js";
 import {
+  requestPasswordReset,
+  checkResetToken,
+  consumeResetToken,
+} from "../services/password-reset.js";
+import {
   issueVerificationToken,
   resendVerification,
   verificationLink,
@@ -91,6 +96,15 @@ const changePasswordSchema = z.object({
 
 const resendSchema = z.object({
   email: z.string().email().optional(),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
 });
 
 interface TokenClaims {
@@ -663,6 +677,173 @@ router.post("/refresh", async (c) => {
 router.post("/logout", async (c) => {
   return c.json({ success: true });
 });
+
+// ---------------------------------------------------------------------------
+// Forgot / reset password
+// ---------------------------------------------------------------------------
+
+/**
+ * Ask for a reset link. Answered identically whether or not the address has an
+ * account — same body, same status — so a stranger cannot use it to discover
+ * who has a Birhan account. The per-account hourly cap lives in the service.
+ */
+router.post("/forgot-password", zValidator("json", forgotPasswordSchema), async (c) => {
+  const { email } = c.req.valid("json");
+
+  const outcome = await requestPasswordReset(email);
+  if (outcome === "send_failed") {
+    // The mail endpoint was down. This says nothing about whether the address is
+    // registered, so it is safe to surface as a "try again" without leaking.
+    throw Errors.unavailable(
+      "MAIL_UNAVAILABLE",
+      "We could not send the reset email just now. Please try again shortly.",
+    );
+  }
+
+  return c.json({
+    status: "sent",
+    message: "If that address has a Birhan account, a reset link is on its way.",
+  });
+});
+
+/**
+ * The page the reset link opens. A browser gets a form; the app (or curl) can
+ * ask for JSON to learn whether the link is still good before showing its own UI.
+ */
+router.get("/reset-password", async (c) => {
+  const token = c.req.query("token") || "";
+  const state = await checkResetToken(token);
+
+  if (wantsJson(c.req.query("format"), c.req.header("accept") || "")) {
+    if (state === "valid") return c.json({ status: "valid" });
+    const [status, code, message] = {
+      used: [410, "TOKEN_USED", "This reset link has already been used."],
+      expired: [410, "TOKEN_EXPIRED", "This reset link has expired."],
+      invalid: [400, "TOKEN_INVALID", "This reset link is not valid."],
+    }[state] as [number, string, string];
+    return c.json({ error: { code, message } }, status as any);
+  }
+
+  return c.html(resetPasswordPage(state, token), (state === "valid" ? 200 : state === "invalid" ? 400 : 410) as any);
+});
+
+/**
+ * Sets the new password from a valid token. Called by the reset page's own
+ * script, and usable directly by the app. Single-use is enforced in the service.
+ */
+router.post("/reset-password", zValidator("json", resetPasswordSchema), async (c) => {
+  const { token, newPassword } = c.req.valid("json");
+  const result = await consumeResetToken(token, newPassword);
+
+  if (result.status === "reset") return c.json({ status: "reset" });
+
+  const [status, code, message] = {
+    used: [410, "TOKEN_USED", "This reset link has already been used."],
+    expired: [410, "TOKEN_EXPIRED", "This reset link has expired."],
+    invalid: [400, "TOKEN_INVALID", "This reset link is not valid."],
+  }[result.status] as [number, string, string];
+  return c.json({ error: { code, message } }, status as any);
+});
+
+/**
+ * The reset page. Bilingual, self-contained, no external assets — same house
+ * style as verificationPage. On a good token it shows a set-password form whose
+ * inline script POSTs to /reset-password and swaps in a success message; on a
+ * bad token it explains what to do instead.
+ */
+function resetPasswordPage(state: string, token: string): string {
+  const bad: Record<string, { am: string; en: string }> = {
+    used: {
+      am: "ይህ አገናኝ ቀደም ሲል ጥቅም ላይ ውሏል። በመተግበሪያው ውስጥ አዲስ ማስጀመሪያ ይጠይቁ።",
+      en: "This link has already been used. Request a new one from the app.",
+    },
+    expired: {
+      am: "የዚህ አገናኝ ጊዜ አልፎበታል። በመተግበሪያው ውስጥ አዲስ ማስጀመሪያ ይጠይቁ።",
+      en: "This link has expired. Request a new one from the app.",
+    },
+    invalid: {
+      am: "ይህ አገናኝ ትክክል አይደለም። እባክዎ ከኢሜይሉ ሙሉውን አድራሻ ይቅዱ።",
+      en: "This link is not valid. Please copy the whole address from the email.",
+    },
+  };
+
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ብርሃን · Birhan</title>
+<style>
+  body{margin:0;padding:32px 20px;font-family:system-ui,-apple-system,"Noto Serif Ethiopic",serif;
+       background:#0b0b0c;color:#f2f2f2;display:flex;justify-content:center}
+  main{max-width:26rem;width:100%}
+  h1{font-size:1.25rem;margin:0 0 1.25rem}
+  p{line-height:1.65;margin:0 0 1rem;font-size:1.05rem}
+  .en{color:#b9b9bd}
+  .mark{font-size:2.5rem;margin-bottom:.5rem}
+  label{display:block;font-size:.85rem;color:#b9b9bd;margin:1rem 0 .35rem}
+  input{width:100%;box-sizing:border-box;padding:.75rem;border-radius:.5rem;border:1px solid #333;
+        background:#141417;color:#f2f2f2;font-size:1rem}
+  button{margin-top:1.25rem;width:100%;padding:.8rem;border:0;border-radius:.5rem;background:#E3A93C;
+         color:#1a1a1a;font-weight:700;font-size:1rem;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .err{color:#f0a3a3;font-size:.9rem;margin-top:.75rem;min-height:1.1rem}
+  .ok .mark{color:#8fd6a3}
+</style>`;
+
+  if (state !== "valid") {
+    const { am, en } = bad[state] ?? bad.invalid;
+    return `<!doctype html><html lang="am"><head>${head}</head><body><main>
+<div class="mark">!</div><h1>ብርሃን · Birhan</h1>
+<p>${am}</p><p class="en">${en}</p></main></body></html>`;
+  }
+
+  // token is fixed-format (selector.verifier) but embed it as a JSON string so
+  // there is no chance of it breaking out of the script context.
+  const tokenJson = JSON.stringify(token);
+  const scheme = `${config.appScheme}://signin`;
+
+  return `<!doctype html><html lang="am"><head>${head}</head><body><main id="wrap">
+<div class="mark">🔑</div>
+<h1>ብርሃን · Birhan</h1>
+<p>አዲስ የይለፍ ቃል ያዘጋጁ።</p>
+<p class="en">Set a new password.</p>
+<form id="f">
+  <label for="p1">አዲስ የይለፍ ቃል · New password</label>
+  <input id="p1" type="password" autocomplete="new-password" minlength="8" required>
+  <label for="p2">ደግመው ያስገቡ · Confirm password</label>
+  <input id="p2" type="password" autocomplete="new-password" minlength="8" required>
+  <div class="err" id="e"></div>
+  <button id="b" type="submit">አስቀምጥ · Save</button>
+</form>
+</main>
+<script>
+(function(){
+  var TOKEN=${tokenJson};
+  var f=document.getElementById('f'),p1=document.getElementById('p1'),p2=document.getElementById('p2'),
+      e=document.getElementById('e'),b=document.getElementById('b');
+  f.addEventListener('submit',function(ev){
+    ev.preventDefault(); e.textContent='';
+    if(p1.value.length<8){e.textContent='የይለፍ ቃል ቢያንስ 8 ፊደላት ይሁን · Use at least 8 characters';return;}
+    if(p1.value!==p2.value){e.textContent='የይለፍ ቃላቱ አይመሳሰሉም · Passwords do not match';return;}
+    b.disabled=true; b.textContent='እየተቀመጠ… · Saving…';
+    fetch('/api/v1/auth/reset-password?format=json',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({token:TOKEN,newPassword:p1.value})})
+    .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+    .then(function(res){
+      if(res.ok){
+        document.getElementById('wrap').innerHTML=
+          '<div class="mark" style="color:#8fd6a3">✓</div><h1>ብርሃን · Birhan</h1>'+
+          '<p>የይለፍ ቃልዎ ተቀይሯል። ወደ ብርሃን ተመልሰው በአዲሱ የይለፍ ቃል ይግቡ።</p>'+
+          '<p class="en">Your password has been changed. Open Birhan and sign in with your new password.</p>'+
+          '<a href="${scheme}" style="display:inline-block;margin-top:1rem;padding:.75rem 1.25rem;border-radius:.5rem;background:#E3A93C;color:#1a1a1a;text-decoration:none;font-weight:600">ብርሃንን ክፈት · Open Birhan</a>';
+      } else {
+        e.textContent=(res.j&&res.j.error&&res.j.error.message)||'Something went wrong. Request a new link from the app.';
+        b.disabled=false; b.textContent='አስቀምጥ · Save';
+      }
+    })
+    .catch(function(){ e.textContent='Network error. Please try again.'; b.disabled=false; b.textContent='አስቀምጥ · Save'; });
+  });
+})();
+</script>
+</body></html>`;
+}
 
 router.post("/change-password", zValidator("json", changePasswordSchema), async (c) => {
   const authCtx = c.get("authContext");

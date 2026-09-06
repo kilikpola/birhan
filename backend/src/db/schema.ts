@@ -299,6 +299,28 @@ export const emailVerificationTokens = pgTable("email_verification_tokens", {
   index("email_verification_tokens_user_id_created_at_idx").on(table.userId, table.createdAt),
 ]);
 
+/**
+ * Password reset tokens, split-token style — the same design as
+ * emailVerificationTokens: `selector` is the public, indexed lookup key and only
+ * sha256(verifier) is stored, so a leaked table yields no working links.
+ *
+ * Short-lived and single-use. `email` pins the token to the address it was
+ * mailed to, so a link cannot reset an account whose email later changed. Rows
+ * are kept after use so the hourly request cap can count them.
+ */
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  selector: text("selector").notNull().unique(),
+  verifierHash: text("verifier_hash").notNull(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("password_reset_tokens_user_created_idx").on(table.userId, table.createdAt),
+]);
+
 // Better Auth sessions table
 /**
  * Tokens that must stop working before they expire on their own.

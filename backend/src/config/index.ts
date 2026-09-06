@@ -63,6 +63,12 @@ export const config = {
   /** Verification emails a single account may trigger per hour. */
   emailResendPerHour: parseInt(process.env.EMAIL_RESEND_PER_HOUR || "3", 10),
 
+  /** How long a password-reset link stays good. Short by design. */
+  passwordResetTtlHours: parseInt(process.env.PASSWORD_RESET_TTL_HOURS || "1", 10),
+
+  /** Reset emails a single account may trigger per hour. */
+  passwordResetPerHour: parseInt(process.env.PASSWORD_RESET_PER_HOUR || "3", 10),
+
   // --- Telegram -----------------------------------------------------------
   //
   // One bot serves every church. A church is tied to its group by a short code
