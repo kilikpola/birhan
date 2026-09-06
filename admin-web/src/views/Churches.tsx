@@ -14,10 +14,6 @@ export function Churches() {
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Church | null>(null);
 
-  if (selected) {
-    return <ChurchDetail church={selected} onBack={() => setSelected(null)} />;
-  }
-
   useEffect(() => {
     (async () => {
       try {
@@ -40,6 +36,12 @@ export function Churches() {
       (c.denomination ?? '').toLowerCase().includes(s)
     );
   });
+
+  // Drill into a church. Kept below every hook above — an early return before a
+  // hook changes the hook count between renders and React throws.
+  if (selected) {
+    return <ChurchDetail church={selected} onBack={() => setSelected(null)} />;
+  }
 
   return (
     <div>
