@@ -782,3 +782,17 @@ body {
   color:var(--danger); border-color:color-mix(in srgb, var(--danger) 50%, transparent);
   background:color-mix(in srgb, var(--danger) 12%, transparent);
 }
+
+/* Branch history modal */
+.branch-name-btn {
+  background:none; border:none; padding:0; margin:0; cursor:pointer;
+  display:flex; align-items:center; gap:9px; font:inherit; color:inherit; text-align:left;
+}
+.branch-name-btn:hover .serif { color:var(--accent); }
+.muted { color:var(--text-faint); }
+.history-lists { max-height:52vh; overflow-y:auto; margin:-4px -4px 0; padding:0 4px; }
+.history-row {
+  display:flex; align-items:center; gap:10px; padding:7px 0;
+  border-top:1px solid var(--border); font-size:14px;
+}
+.history-row:first-child { border-top:none; }

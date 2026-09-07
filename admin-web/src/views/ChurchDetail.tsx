@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../api';
-import type { Branch, Church, ChurchPerson, BranchChoice, Role } from '../types';
+import type { Branch, Church, ChurchPerson, BranchChoice, Role, BranchHistory } from '../types';
 import { useI18n, t } from '../i18n';
 import { BranchChoiceModal } from '../components/BranchChoiceModal';
 import { Avatar } from '../components/Avatar';
@@ -36,6 +36,26 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
   const [removing, setRemoving] = useState<ChurchPerson | null>(null);
   const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // Branch history modal (current members + ex-members)
+  const [historyBranch, setHistoryBranch] = useState<Branch | null>(null);
+  const [history, setHistory] = useState<BranchHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const openHistory = async (b: Branch) => {
+    setHistoryBranch(b);
+    setHistory(null);
+    setHistoryLoading(true);
+    try {
+      const data = await apiFetch<BranchHistory>(`/api/v1/admin/branches/${b.id}/history`);
+      setHistory(data);
+    } catch (e: any) {
+      alert(e?.message ?? String(e));
+      setHistoryBranch(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const mothers = branches.filter((b) => !b.parentBranchId);
 
@@ -228,12 +248,18 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
               const peopleOn = people.filter((p) => p.branchId === b.id).length;
               return (
                 <div className={'branch-node' + (isMother ? '' : ' child')} key={b.id}>
-                  <div className="branch-node-name">
+                  <button className="branch-node-name branch-name-btn" onClick={() => openHistory(b)} title={t(lang, 'branchHistory')}>
                     <span className="serif">{b.nameEn}</span>
                     {isMother && childCount > 0 && <span className="chip role">{t(lang, 'motherLabel')}</span>}
-                  </div>
+                  </button>
                   <div className="branch-node-meta">
                     {peopleOn > 0 ? <span className="chip tnum">{peopleOn} {t(lang, 'peopleTitle')}</span> : null}
+                    <button
+                      className="branch-del"
+                      title={t(lang, 'branchHistory')}
+                      aria-label={t(lang, 'branchHistory')}
+                      onClick={() => openHistory(b)}
+                    >🕘</button>
                     <button
                       className="branch-del"
                       title={t(lang, 'deleteBranch')}
@@ -368,6 +394,56 @@ export function ChurchDetail({ church, onBack }: { church: Church; onBack: () =>
           </div>
         );
       })()}
+
+      {historyBranch && (
+        <div className="modal-back" onClick={() => setHistoryBranch(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <h3>{t(lang, 'branchHistoryTitle').replace('%s', historyBranch.nameEn)}</h3>
+            {historyLoading || !history ? (
+              <div className="loading">{t(lang, 'loading')}</div>
+            ) : (
+              <div className="history-lists">
+                <div className="history-group">
+                  <div className="section-head" style={{ margin: '4px 0 8px' }}>
+                    <h2 style={{ fontSize: 14 }}>{t(lang, 'currentMembers')}</h2>
+                    <span className="count tnum">{history.current.length}</span>
+                  </div>
+                  {history.current.length === 0 ? (
+                    <div className="muted" style={{ fontSize: 13 }}>{t(lang, 'noPeopleYet')}</div>
+                  ) : history.current.map((p) => (
+                    <div className="history-row" key={p.id}>
+                      <Avatar name={p.displayName} size={30} />
+                      <span>{p.displayName}</span>
+                      <span className="chip dot role" style={{ marginLeft: 'auto' }}>{t(lang, ROLE_KEY[p.role])}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="history-group">
+                  <div className="section-head" style={{ margin: '14px 0 8px' }}>
+                    <h2 style={{ fontSize: 14 }}>{t(lang, 'formerMembers')}</h2>
+                    <span className="count tnum">{history.former.length}</span>
+                  </div>
+                  {history.former.length === 0 ? (
+                    <div className="muted" style={{ fontSize: 13 }}>{t(lang, 'noFormerMembers')}</div>
+                  ) : history.former.map((p) => (
+                    <div className="history-row" key={p.profileId}>
+                      <Avatar name={p.displayName} size={30} />
+                      <span>{p.displayName}</span>
+                      <span className="muted" style={{ marginLeft: 'auto', fontSize: 12.5 }}>
+                        {t(lang, 'nowIn').replace('%s', p.currentBranchName ?? t(lang, 'branchNone'))}
+                        {p.leftAt ? ` · ${timeAgo(p.leftAt, lang)}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setHistoryBranch(null)}>{t(lang, 'cancel')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

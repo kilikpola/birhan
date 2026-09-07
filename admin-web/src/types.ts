@@ -89,6 +89,19 @@ export type BranchChoice = {
   newBranchName?: string;
 };
 
+/** GET /api/v1/admin/branches/:id/history — current members and ex-members. */
+export type BranchHistory = {
+  branch: { id: string; name: string };
+  current: { id: string; displayName: string; role: Role; email: string | null }[];
+  former: {
+    profileId: string;
+    displayName: string;
+    currentBranchName: string | null;
+    currentBranchId: string | null;
+    leftAt: string | null;
+  }[];
+};
+
 /** Row in GET /api/v1/admin/church-requests. */
 export type ChurchRequest = {
   id: string;
