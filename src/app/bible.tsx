@@ -29,6 +29,8 @@ import {
   type StudyVerseRef,
   type NavigateTarget,
 } from "@/components/verse-study/verse-study-sheets";
+import { CoachMarks, type CoachStep } from "@/components/coach-marks";
+import { hasSeenTour, markTourSeen } from "@/lib/coachTours";
 
 interface Book {
   id: number;
@@ -84,6 +86,44 @@ export default function BibleScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const pendingPosRef = useRef<{ book: number; chapter: number } | null>(null);
   const savePosTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // First-run coach-mark tour: spotlight the book picker, search, language
+  // toggle, and a verse the first time this screen is opened. Measured live, so
+  // the refs point at the real controls.
+  const bookBtnRef = useRef<any>(null);
+  const searchBtnRef = useRef<any>(null);
+  const langBtnRef = useRef<any>(null);
+  const firstVerseRef = useRef<any>(null);
+  const [tourVisible, setTourVisible] = useState(false);
+
+  const coachSteps: CoachStep[] = useMemo(() => [
+    { targetRef: bookBtnRef, titleKey: 'coachBibleBookTitle', bodyKey: 'coachBibleBookBody' },
+    { targetRef: searchBtnRef, titleKey: 'coachBibleSearchTitle', bodyKey: 'coachBibleSearchBody' },
+    { targetRef: langBtnRef, titleKey: 'coachBibleLangTitle', bodyKey: 'coachBibleLangBody' },
+    { targetRef: firstVerseRef, titleKey: 'coachBibleVerseTitle', bodyKey: 'coachBibleVerseBody' },
+  ], []);
+
+  const finishTour = useCallback(() => {
+    setTourVisible(false);
+    markTourSeen('bible');
+  }, []);
+
+  // Show the tour on first visit — and again after "Replay the guide" clears the
+  // flag, since re-focusing the tab re-checks it. Checked on focus (not once)
+  // and re-run when the data loads, so a still-loading first launch is covered.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        if (books.length === 0 || verses.length === 0 || tourVisible) return;
+        const seen = await hasSeenTour('bible').catch(() => true);
+        if (cancelled || seen) return;
+        // Let the header and first verse settle into layout before measuring.
+        setTimeout(() => { if (!cancelled) setTourVisible(true); }, 550);
+      })();
+      return () => { cancelled = true; };
+    }, [books.length, verses.length, tourVisible]),
+  );
 
   const flushReadingPosition = useCallback(async () => {
     const pos = pendingPosRef.current;
@@ -422,6 +462,7 @@ export default function BibleScreen() {
 
           <View style={styles.headerActions}>
             <TouchableOpacity
+              ref={bookBtnRef}
               onPress={() => setSelectorOpen(true)}
               style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
               accessibilityRole="button"
@@ -430,6 +471,7 @@ export default function BibleScreen() {
               <Icon name="book" size={17} color={c.textSoft} />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={searchBtnRef}
               onPress={() => setSearchOpen(true)}
               style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
               accessibilityRole="button"
@@ -438,6 +480,7 @@ export default function BibleScreen() {
               <Icon name="search" size={17} color={c.textSoft} />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={langBtnRef}
               onPress={() => setLangOpen(true)}
               style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
               accessibilityRole="button"
@@ -464,7 +507,7 @@ export default function BibleScreen() {
                   }
                   return true;
                 })
-                .map((v) => {
+                .map((v, vi) => {
                   const isSelected = studyVerseNum === v.verse;
                   const highlightColor = highlights[v.verse];
                   const isBookmarked = bookmarks.has(v.verse);
@@ -472,6 +515,7 @@ export default function BibleScreen() {
                   return (
                     <TouchableOpacity
                       key={v.verse}
+                      ref={vi === 0 ? firstVerseRef : undefined}
                       activeOpacity={0.7}
                       onPress={() => {
                         setStudyVerseNum(v.verse);
@@ -794,6 +838,8 @@ export default function BibleScreen() {
         isBookmarked={studyVerseNum !== null && bookmarks.has(studyVerseNum)}
         onToggleBookmark={toggleBookmark}
       />
+
+      <CoachMarks c={c} lang={lang} steps={coachSteps} visible={tourVisible} onDone={finishTour} />
     </SafeAreaView>
   );
 }

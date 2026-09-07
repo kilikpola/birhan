@@ -18,6 +18,7 @@ import { radius, space } from '@/theme/tokens';
 
 import { Section, Card, Row, SubLabel, ChoiceRows, ToggleRow } from '@/components/settings/rows';
 import { isDailyVerseEnabled, setDailyVerseEnabled } from '@/lib/dailyVerse';
+import { resetAllTours } from '@/lib/coachTours';
 import { AccountSection } from '@/components/settings/account-section';
 import { DataSection } from '@/components/settings/data-section';
 import { UpdateSection } from '@/components/settings/update-section';
@@ -239,6 +240,15 @@ export default function SettingsScreen() {
           <Section c={c} lang={lang} title={t(lang, 'sectionAbout')}>
             <Card c={c}>
               <Row c={c} lang={lang} label={t(lang, 'helpRow')} onPress={() => router.push('/help' as Href)} />
+              <Row
+                c={c}
+                lang={lang}
+                label={t(lang, 'replayGuide')}
+                onPress={async () => {
+                  await resetAllTours();
+                  router.push('/bible' as Href);
+                }}
+              />
               <Row c={c} lang={lang} label={t(lang, 'about')} onPress={() => router.push('/about' as Href)} />
               <Row
                 c={c}
