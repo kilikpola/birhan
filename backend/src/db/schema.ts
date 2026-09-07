@@ -6,6 +6,7 @@ export const pastorStatusEnum = pgEnum("pastor_status", ["pending", "approved", 
 export const languageEnum = pgEnum("language", ["am", "en"]);
 export const resourceCategoryEnum = pgEnum("resource_category", ["sermon_notes", "study_guide", "calendar", "announcement_doc", "other"]);
 export const churchRequestStatusEnum = pgEnum("church_request_status", ["pending", "approved", "rejected"]);
+export const branchChangeStatusEnum = pgEnum("branch_change_status", ["pending", "approved", "rejected"]);
 
 // Better Auth manages its own users table — we reference it
 export const churches = pgTable("churches", {
@@ -36,6 +37,36 @@ export const branches = pgTable("branches", {
 }, (table) => [
   index("branches_church_id_idx").on(table.churchId),
   index("branches_parent_branch_id_idx").on(table.parentBranchId),
+]);
+
+/**
+ * Branch-change requests, which double as branch-membership history.
+ *
+ * A member who moves asks to switch branch; a pastor or admin of their church
+ * approves, and only then does profiles.branchId change. An APPROVED row is the
+ * history record — from_branch_* is a branch the person has since left ("ex
+ * branch"). Branch names are snapshotted so history stays readable after a
+ * branch is deleted (the ids go null, the names remain). One pending request per
+ * person (partial unique index, migration 0012).
+ */
+export const branchChangeRequests = pgTable("branch_change_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profileId: uuid("profile_id").notNull().references((): AnyPgColumn => profiles.id, { onDelete: "cascade" }),
+  churchId: uuid("church_id").notNull().references(() => churches.id, { onDelete: "cascade" }),
+  fromBranchId: uuid("from_branch_id").references((): AnyPgColumn => branches.id, { onDelete: "set null" }),
+  fromBranchName: text("from_branch_name"),
+  toBranchId: uuid("to_branch_id").references((): AnyPgColumn => branches.id, { onDelete: "set null" }),
+  toBranchName: text("to_branch_name").notNull(),
+  status: branchChangeStatusEnum("status").notNull().default("pending"),
+  reason: text("reason"),
+  rejectedReason: text("rejected_reason"),
+  decidedBy: uuid("decided_by").references((): AnyPgColumn => profiles.id, { onDelete: "set null" }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("branch_change_church_status_idx").on(table.churchId, table.status),
+  index("branch_change_profile_idx").on(table.profileId),
+  index("branch_change_from_branch_idx").on(table.fromBranchId),
 ]);
 
 export const profiles = pgTable("profiles", {

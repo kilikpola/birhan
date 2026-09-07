@@ -2,12 +2,17 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../db/index.js";
-import { profiles, users } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { profiles, users, branches } from "../db/schema.js";
+import { eq, and } from "drizzle-orm";
 import { Errors } from "../utils/errors.js";
 import { normalizePhone } from "../utils/phone.js";
 import { deleteOwnAccount } from "../services/account-deletion.js";
 import { registerPushToken, removePushToken } from "../services/push.js";
+import {
+  requestBranchChange,
+  getMyPendingBranchChange,
+  getMyBranchHistory,
+} from "../services/branch-change.js";
 
 const router = new Hono();
 
@@ -70,7 +75,28 @@ router.patch("/", zValidator("json", patchMeSchema), async (c) => {
   const updates: any = {};
   if (body.displayName !== undefined) updates.displayName = body.displayName;
   if (body.language !== undefined) updates.language = body.language;
-  if (body.branchId !== undefined) updates.branchId = body.branchId;
+  if (body.branchId !== undefined) {
+    // A member may self-pick a branch only when they currently have none (first
+    // choice, or after their old branch was deleted). Switching FROM an existing
+    // branch goes through a pastor-approved request — see /me/branch-change.
+    const current = await db.query.profiles.findFirst({
+      where: eq(profiles.id, ctx.userId),
+      columns: { branchId: true, churchId: true },
+    });
+    if (current?.branchId && body.branchId && body.branchId !== current.branchId) {
+      throw Errors.forbidden(
+        "To move to a different branch, ask a pastor to approve the change.",
+      );
+    }
+    if (body.branchId) {
+      // The target must belong to the caller's church.
+      const target = await db.query.branches.findFirst({
+        where: and(eq(branches.id, body.branchId), eq(branches.churchId, current!.churchId)),
+      });
+      if (!target) throw Errors.validation("That branch is not part of your church");
+    }
+    updates.branchId = body.branchId;
+  }
   if (body.churchRole !== undefined) updates.churchRole = body.churchRole;
 
   if (body.phone !== undefined) {
@@ -113,6 +139,38 @@ router.delete("/push-token", zValidator("json", z.object({ token: z.string().min
   const body = c.req.valid("json");
   await removePushToken(ctx, body.token);
   return c.body(null, 204);
+});
+
+// --- Branch change (member side) ---
+
+const branchChangeSchema = z.object({
+  toBranchId: z.string().uuid(),
+  reason: z.string().trim().max(500).optional(),
+});
+
+/** Ask to move to another branch of your church. A pastor approves it. */
+router.post("/branch-change", zValidator("json", branchChangeSchema), async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+  const body = c.req.valid("json");
+  const request = await requestBranchChange(ctx, body.toBranchId, body.reason);
+  return c.json(request, 201);
+});
+
+/** The caller's pending branch-change request, or null. */
+router.get("/branch-change", async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+  const pending = await getMyPendingBranchChange(ctx);
+  return c.json({ pending });
+});
+
+/** The caller's branch history — current branch and the ones they've left. */
+router.get("/branch-history", async (c) => {
+  const ctx = c.get("authContext");
+  if (!ctx) throw Errors.unauthenticated();
+  const history = await getMyBranchHistory(ctx);
+  return c.json(history);
 });
 
 /**

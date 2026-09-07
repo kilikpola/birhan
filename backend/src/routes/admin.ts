@@ -22,6 +22,7 @@ import {
   makePastor,
   removePastor,
 } from "../services/church-admin.js";
+import { getBranchHistory } from "../services/branch-change.js";
 import { Errors } from "../utils/errors.js";
 
 const router = new Hono();
@@ -189,6 +190,13 @@ router.post("/people/:id/remove-pastor", async (c) => {
   const userId = c.req.param("id");
   const result = await removePastor(ctx, userId);
   return c.json(result);
+});
+
+/** A branch's current members and its ex-members (people who moved away). */
+router.get("/branches/:branchId/history", async (c) => {
+  const ctx = c.get("authContext");
+  const history = await getBranchHistory(ctx, c.req.param("branchId"));
+  return c.json(history);
 });
 
 export default router;
