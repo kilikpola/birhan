@@ -43,6 +43,7 @@ import { Cross } from '../components/cross';
 import { reportError } from '../lib/errors';
 import { AdminSkeleton } from '../components/skeletons/admin-skeleton';
 import { SectionBoundary } from '../components/section-boundary';
+import { BranchRequests } from '../components/branch-requests';
 
 /**
  * Pastor Admin Panel Screen.
@@ -515,6 +516,8 @@ export default function AdminScreen() {
               /* MEMBER ROSTER TAB */
               <SectionBoundary name="Admin.Roster" onRetry={loadMembers}>
                 <View>
+                  {/* Pending branch-change requests appear here for approval. */}
+                  <BranchRequests c={colors} lang={lang} onChanged={loadMembers} />
                   <View style={[s.manuscript, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: space.md }]}>
                     <View style={[s.spine, { backgroundColor: colors.accent }]} />
                     <Text style={[s.eyebrow, { color: colors.accent }]}>

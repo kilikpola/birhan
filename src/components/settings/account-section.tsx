@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { router, type Href } from 'expo-router';
 import { space } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { t, type Lang } from '@/i18n';
@@ -114,7 +115,13 @@ export function AccountSection({
       <Card c={c}>
         <Row c={c} lang={lang} label={isAm ? 'ሙሉ ስም' : 'Name'} value={profile?.display_name || '—'} />
         <Row c={c} lang={lang} label={t(lang, 'churchLabel')} value={church} />
-        <Row c={c} lang={lang} label={t(lang, 'branchLabel')} value={profile?.branch_name || '—'} />
+        <Row
+          c={c}
+          lang={lang}
+          label={t(lang, 'branchLabel')}
+          value={profile?.branch_name || '—'}
+          onPress={() => router.push('/branch-change' as Href)}
+        />
         {role ? <Row c={c} lang={lang} label={t(lang, 'roleLabel')} value={role} /> : null}
         <Row
           c={c}
