@@ -1,11 +1,9 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useApp } from '@/theme/context';
 import { t } from '@/i18n';
-import { useAuth } from '../lib/auth';
 
 export default function AppTabs() {
   const { c: colors, lang } = useApp();
-  const { isPastor } = useAuth();
 
   return (
     <NativeTabs
@@ -28,10 +26,10 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="resources">
-        <NativeTabs.Trigger.Label>{t(lang, "resources")}</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="audio">
+        <NativeTabs.Trigger.Label>{t(lang, "audio")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/resources.png')}
+          src={require('@/assets/images/tabIcons/audio.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
@@ -39,20 +37,10 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="explore">
         <NativeTabs.Trigger.Label>{t(lang, "settingsTitle")}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/more.png')}
+          src={require('@/assets/images/tabIcons/settings.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
-
-      {isPastor && (
-        <NativeTabs.Trigger name="admin">
-          <NativeTabs.Trigger.Label>{t(lang, "admin")}</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon
-            src={require('@/assets/images/tabIcons/admin.png')}
-            renderingMode="template"
-          />
-        </NativeTabs.Trigger>
-      )}
     </NativeTabs>
   );
 }

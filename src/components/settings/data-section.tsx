@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
-import { radius, space, fonts } from '@/theme/tokens';
+import { radius, space } from '@/theme/tokens';
 import type { Palette } from '@/theme/tokens';
 import { t, type Lang } from '@/i18n';
 import { Card, Row, ToggleRow } from './rows';
@@ -46,7 +46,7 @@ export function DataSection({ c, lang }: { c: Palette; lang: Lang }) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    setTimeout(() => refresh(), 0);
   }, [refresh]);
 
   const startPatristic = async () => {
@@ -150,12 +150,6 @@ export function DataSection({ c, lang }: { c: Palette; lang: Lang }) {
         <Row
           c={c}
           lang={lang}
-          label={t(lang, 'storageResources')}
-          value={storage ? formatBytes(storage.resourcesBytes) : '…'}
-        />
-        <Row
-          c={c}
-          lang={lang}
           label={t(lang, 'storageCache')}
           value={storage ? formatBytes(storage.cacheBytes) : '…'}
         />
@@ -246,9 +240,9 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: space.sm },
   title: { fontSize: 14.5, fontWeight: '700' },
   action: { fontSize: 14.5, fontWeight: '600' },
-  actionAm: { fontFamily: fonts.amBold, lineHeight: 27 },
-  note: { fontSize: 12.5, lineHeight: 18 },
-  noteAm: { fontFamily: fonts.am, lineHeight: 24 },
+  actionAm: { lineHeight: 26 },
+  note: { fontSize: 13, lineHeight: 18 },
+  noteAm: { lineHeight: 22 },
   tap: { minHeight: 48, justifyContent: 'center' },
   cta: { minHeight: 48, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   ctaTxt: { fontSize: 14.5, fontWeight: '700' },

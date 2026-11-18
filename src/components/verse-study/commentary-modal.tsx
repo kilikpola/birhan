@@ -80,9 +80,11 @@ export function CommentaryModal({
   useEffect(() => {
     if (!visible) {
       cancelPatristicDownload();
-      setDownloading(false);
-      setProgress(0);
-      setDownloadNotice(null);
+      setTimeout(() => {
+        setDownloading(false);
+        setProgress(0);
+        setDownloadNotice(null);
+      }, 0);
     }
   }, [visible]);
 

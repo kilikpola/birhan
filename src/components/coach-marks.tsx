@@ -9,7 +9,7 @@ import {
   type LayoutRectangle,
 } from 'react-native';
 import { t, type Lang } from '../i18n';
-import { fonts, type Palette } from '../theme/tokens';
+import type { Palette } from '../theme/tokens';
 
 /**
  * Coach marks — a first-run guided tour that dims the screen and spotlights a
@@ -128,14 +128,14 @@ export function CoachMarks({
 
   // Reset to the first step every time the tour opens.
   useEffect(() => {
-    if (visible) { setIndex(0); }
+    if (visible) { setTimeout(() => setIndex(0), 0); }
   }, [visible]);
 
   // Measure the current step's target when it becomes active.
   useEffect(() => {
     if (!visible || !step) return;
     let alive = true;
-    setTarget(null);
+    setTimeout(() => setTarget(null), 0);
     const node = step.targetRef.current;
     if (!node || typeof node.measureInWindow !== 'function') return;
     // A tick lets the target settle after any layout/scroll before measuring.
@@ -230,9 +230,9 @@ const styles = StyleSheet.create({
   tip: { position: 'absolute', borderRadius: 14, borderWidth: 1, padding: 16, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   arrow: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 8, borderRightWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
   title: { fontSize: 16.5, fontWeight: '700', marginBottom: 6 },
-  am: { fontFamily: fonts.amBold },
+  am: {},
   body: { fontSize: 14, lineHeight: 21 },
-  amBody: { lineHeight: 24, fontFamily: fonts.am },
+  amBody: { lineHeight: 24 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   count: { fontSize: 12, fontVariant: ['tabular-nums'] },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 14 },

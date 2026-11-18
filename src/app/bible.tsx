@@ -3,22 +3,23 @@ import {
   StyleSheet,
   View,
   ScrollView,
-  TouchableOpacity,
   Modal,
   TextInput,
   FlatList,
-  Platform,
+  Text,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSQLiteContext } from "expo-sqlite";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useApp } from "@/theme/context";
 import { getLocalDb, runTransactionExclusive, saveReadingPosition } from "@/utils/db";
 import { searchBible, VerseResult } from "@/utils/search";
-import { ThemedText } from "@/components/themed-text";
 import { Icon } from "@/components/icon";
 import { toGeezNumeral } from "@/lib/ethiopian";
-import { radius, fonts, space } from "@/theme/tokens";
+import { radius, fonts, space, TARGET, readerScale, type ReaderSize } from "@/theme/tokens";
+import { t } from "@/i18n";
+import type { ThemeMode } from "@/theme/context";
 import { reportError } from "@/lib/errors";
 import { BibleSkeleton } from "@/components/skeletons/bible-skeleton";
 import { useSkeleton } from "@/lib/use-skeleton";
@@ -31,6 +32,9 @@ import {
 } from "@/components/verse-study/verse-study-sheets";
 import { CoachMarks, type CoachStep } from "@/components/coach-marks";
 import { hasSeenTour, markTourSeen } from "@/lib/coachTours";
+import { AudioPlayerOverlay } from "@/components/audio/AudioPlayerOverlay";
+import { downloadChapter } from "@/lib/audioDownload";
+import { initAudioPlayer } from "@/lib/audioPlayer";
 
 interface Book {
   id: number;
@@ -49,7 +53,9 @@ interface Verse {
 
 export default function BibleScreen() {
   const db = useSQLiteContext();
-  const { c, lang, readingLang, setReadingLang } = useApp();
+  const { c, lang, readingLang, setReadingLang, readerSize, setReaderSize, themeMode, setThemeMode } = useApp();
+  // A verse to open, handed over by the Today screen's search.
+  const params = useLocalSearchParams<{ book?: string; chapter?: string; verse?: string }>();
   const isAm = lang === 'am';
 
   // Navigation state
@@ -76,6 +82,10 @@ export default function BibleScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<VerseResult[]>([]);
+
+  // Audio player state
+  const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
+  const [audioDownloading, setAudioDownloading] = useState(false);
 
   // Selection state (clicked verse)
   const [loadingChapter, setLoadingChapter] = useState(false);
@@ -136,7 +146,34 @@ export default function BibleScreen() {
     }
   }, [lang]);
 
-  const { showSkeleton: showBibleSkeleton, timedOut: bibleTimedOut } = useSkeleton({
+  // Initialize audio player on mount
+  useEffect(() => {
+    initAudioPlayer().catch(err => reportError(err, "BibleScreen.initAudioPlayer", lang, false));
+  }, [lang]);
+
+  const handlePlayAudio = useCallback(async () => {
+    if (!currentBook) return;
+    
+    setAudioDownloading(true);
+    try {
+      await downloadChapter(currentBook.id, currentChapter);
+      setAudioPlayerVisible(true);
+    } catch (err) {
+      reportError(err instanceof Error ? err : new Error('Failed to load audio'), 'BibleScreen.playAudio');
+    } finally {
+      setAudioDownloading(false);
+    }
+  }, [currentBook, currentChapter]);
+
+  const handleLoadAudioChapter = useCallback(async (bookId: number, chapter: number) => {
+    try {
+      await downloadChapter(bookId, chapter);
+    } catch (err) {
+      reportError(err instanceof Error ? err : new Error('Failed to load audio chapter'), 'BibleScreen.loadAudioChapter');
+    }
+  }, []);
+
+  const { showSkeleton: showBibleSkeleton } = useSkeleton({
     loading: loadingChapter,
     hasData: verses.length > 0,
   });
@@ -160,7 +197,13 @@ export default function BibleScreen() {
           "SELECT book, chapter FROM reading_position ORDER BY updated_at DESC LIMIT 1"
         );
 
-        if (lastPos && typeof lastPos.book === 'number' && typeof lastPos.chapter === 'number' && booksList.length > 0) {
+        const askedBook = Number(params.book);
+        const askedChapter = Number(params.chapter);
+        const asked = booksList.find((b: Book) => b.id === askedBook);
+        if (asked && askedChapter >= 1) {
+          setCurrentBook(asked);
+          setCurrentChapter(askedChapter);
+        } else if (lastPos && typeof lastPos.book === 'number' && typeof lastPos.chapter === 'number' && booksList.length > 0) {
           const matchedBook = booksList.find((b: Book) => b.id === lastPos.book) || booksList[0];
           setCurrentBook(matchedBook);
           setCurrentChapter(lastPos.chapter ?? 1);
@@ -173,7 +216,22 @@ export default function BibleScreen() {
       }
     }
     init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, lang]);
+
+  // Today's search hands a verse over through the route. The init above covers
+  // a first visit; this covers a Bible tab that is already open.
+  useEffect(() => {
+    const b = books.find((bk) => bk.id === Number(params.book));
+    const ch = Number(params.chapter);
+    if (!b || !(ch >= 1)) return;
+    setTimeout(() => {
+      setCurrentBook(b);
+      setCurrentChapter(ch);
+      const v = Number(params.verse);
+      if (v >= 1) setStudyVerseNum(v);
+    }, 0);
+  }, [params.book, params.chapter, params.verse, books]);
 
   // Load verses, highlights, and bookmarks when book/chapter changes
   useEffect(() => {
@@ -349,7 +407,7 @@ export default function BibleScreen() {
   // Search debounced
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults([]);
+      setTimeout(() => setSearchResults([]), 0);
       return;
     }
     const delayDebounceFn = setTimeout(async () => {
@@ -440,312 +498,364 @@ export default function BibleScreen() {
     { name: "Red", hex: "rgba(210,86,75,0.25)" },
   ];
 
+  // Where the chapter buttons go, named — "Genesis 3", not "Next".
+  const bookIndex = currentBook ? books.findIndex((b) => b.id === currentBook.id) : -1;
+  const prevTarget = !currentBook
+    ? null
+    : currentChapter > 1
+      ? { book: currentBook, chapter: currentChapter - 1 }
+      : bookIndex > 0
+        ? { book: books[bookIndex - 1], chapter: books[bookIndex - 1].chapters }
+        : null;
+  const nextTarget = !currentBook
+    ? null
+    : currentChapter < currentBook.chapters
+      ? { book: currentBook, chapter: currentChapter + 1 }
+      : bookIndex >= 0 && bookIndex < books.length - 1
+        ? { book: books[bookIndex + 1], chapter: 1 }
+        : null;
+  const numeral = (n: number) => (isAm ? toGeezNumeral(n) : String(n));
+  const bookName = (b: Book) => (isAm ? b.name_am : b.name_en);
+
+  // Scripture sizes follow the reader's own text-size choice, on top of the
+  // phone's font-size setting (which RN applies to every Text already).
+  const k = readerScale[readerSize];
+  const amStyle = { fontFamily: fonts.am, fontSize: Math.round(19 * k), lineHeight: Math.round(35 * k), color: c.text };
+  const enStyle = { fontFamily: fonts.serif, fontSize: Math.round(17 * k), lineHeight: Math.round(28 * k), color: c.text };
+  const numStyle = { fontFamily: fonts.amBold, fontSize: Math.round(13 * k), color: c.accent };
+
+  const shownVerses = verses.filter((v) =>
+    viewMode === "am" ? v.verse === v.am_merge_head && v.text_am !== "" : true,
+  );
+
+  const openVerse = (n: number) => {
+    setStudyVerseNum(n);
+    setStudyPanel("actions");
+  };
+
+  /**
+   * The KJV source marks words the translators supplied as {word} — printed
+   * Bibles set them in italics — and carries marginal notes inline as
+   * {word: Heb. note}. Show the first as italics, drop the second.
+   */
+  const kjv = (text: string) =>
+    text
+      .replace(/\s*\{[^{}]*:[^{}]*\}/g, "")
+      .split(/(\{[^{}]*\})/)
+      .filter(Boolean)
+      .map((part, i) =>
+        part.startsWith("{") ? (
+          <Text key={i} style={{ fontStyle: "italic" }}>{part.slice(1, -1)}</Text>
+        ) : (
+          part
+        ),
+      );
+
+  /** One verse as a run of text inside the paragraph: numeral, then words. */
+  const verseSpan = (v: Verse, text: string, base: object) => {
+    const selected = studyVerseNum === v.verse;
+    const hl = highlights[v.verse];
+    const marked = bookmarks.has(v.verse);
+    return (
+      <Text
+        key={v.verse}
+        onPress={() => openVerse(v.verse)}
+        suppressHighlighting
+        accessibilityRole="button"
+        accessibilityLabel={`${numeral(v.verse)}${marked ? `, ${t(lang, "a11yBookmarked")}` : ""}. ${text.replace(/\s*\{[^{}]*:[^{}]*\}/g, "").replace(/[{}]/g, "")}`}
+        style={[
+          base,
+          hl ? { backgroundColor: hl } : null,
+          selected ? { backgroundColor: c.accentGlow, textDecorationLine: "underline", textDecorationColor: c.accent } : null,
+        ]}
+      >
+        <Text
+          style={[
+            numStyle,
+            marked ? { color: c.onAccent, backgroundColor: c.accent } : null,
+          ]}
+        >
+          {marked ? ` ${numeral(v.verse)} ` : numeral(v.verse)}
+        </Text>
+        {" "}
+        {base === enStyle ? kjv(text) : text}
+        {"  "}
+      </Text>
+    );
+  };
+
+  const themeOptions: { value: ThemeMode; label: string }[] = [
+    { value: "dark", label: t(lang, "themeDark") },
+    { value: "light", label: t(lang, "themeLight") },
+    { value: "system", label: t(lang, "themeSystem") },
+  ];
+  const sizeOptions: ReaderSize[] = ["sm", "md", "lg", "xl"];
+
   return (
-    <SafeAreaView style={[styles.outer, { backgroundColor: c.bg }]}>
-      {/* Top Header */}
+    <SafeAreaView style={[styles.outer, { backgroundColor: c.bg }]} edges={["top", "left", "right"]}>
+      {/* Toolbar. The reference is the title and the way to change it — the
+          familiar "tap the title to choose" pattern, with a chevron to say so. */}
       <SectionBoundary name="Bible.Nav">
         <View style={[styles.header, { borderBottomColor: c.border, backgroundColor: c.bg }]}>
-          {/* Where you are, kept as plain text rather than a card. Something has
-              to say which chapter is on screen, and this is the smallest thing
-              that can. Tapping it opens the same picker as the book button. */}
-          <TouchableOpacity
+          <Pressable
+            ref={bookBtnRef}
             onPress={() => setSelectorOpen(true)}
             style={styles.headerRef}
-            activeOpacity={0.7}
             accessibilityRole="button"
+            accessibilityLabel={`${currentBook ? bookName(currentBook) : ""} ${numeral(currentChapter)}. ${t(lang, "a11yChooseChapter")}`}
+            android_ripple={{ color: c.border, borderless: false }}
           >
-            <ThemedText type="smallBold" colorType="text" isAmharic={isAm} numberOfLines={1}>
-              {currentBook ? (isAm ? currentBook.name_am : currentBook.name_en) : ""}{" "}
-              {isAm ? toGeezNumeral(currentChapter) : currentChapter}
-            </ThemedText>
-          </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: c.text }, isAm && styles.headerTitleAm]} numberOfLines={1}>
+              {currentBook ? bookName(currentBook) : ""} {numeral(currentChapter)}
+            </Text>
+            <Icon name="chevDown" size={16} color={c.textSoft} />
+          </Pressable>
 
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              ref={bookBtnRef}
-              onPress={() => setSelectorOpen(true)}
-              style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
-              accessibilityRole="button"
-              accessibilityLabel={isAm ? "መጽሐፍ ይምረጡ" : "Select book"}
-            >
-              <Icon name="book" size={17} color={c.textSoft} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              ref={searchBtnRef}
-              onPress={() => setSearchOpen(true)}
-              style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
-              accessibilityRole="button"
-              accessibilityLabel={isAm ? "ፈልግ" : "Search"}
-            >
-              <Icon name="search" size={17} color={c.textSoft} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              ref={langBtnRef}
-              onPress={() => setLangOpen(true)}
-              style={[styles.iconbtn, { borderColor: c.border, backgroundColor: c.surface }]}
-              accessibilityRole="button"
-              accessibilityLabel={isAm ? "ቋንቋ" : "Language"}
-            >
-              <Icon name="globe" size={17} color={c.textSoft} />
-            </TouchableOpacity>
-          </View>
+          <Pressable
+            ref={searchBtnRef}
+            onPress={() => setSearchOpen(true)}
+            style={styles.toolBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, "a11ySearch")}
+            android_ripple={{ color: c.border, borderless: true, radius: 24 }}
+          >
+            <Icon name="search" size={22} color={c.text} />
+          </Pressable>
+          <Pressable
+            ref={langBtnRef}
+            onPress={() => setLangOpen(true)}
+            style={styles.toolBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, "a11yReadingOptions")}
+            android_ripple={{ color: c.border, borderless: true, radius: 24 }}
+          >
+            <Icon name="textSize" size={22} color={c.text} />
+          </Pressable>
+          <Pressable
+            onPress={handlePlayAudio}
+            disabled={!currentBook || audioDownloading}
+            style={styles.toolBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t(lang, "audioPlayer")}
+            android_ripple={{ color: c.border, borderless: true, radius: 24 }}
+          >
+            <Icon name={audioDownloading ? "loading" : "play"} size={22} color={c.accent} />
+          </Pressable>
         </View>
       </SectionBoundary>
 
-      {/* Reader Layout Scroll */}
-      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.versesContainer}>
-        {/* Verse Cards Container */}
+      {/* The page. No card around scripture: the text is the content, and it
+          gets the whole width. */}
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.page}>
         <SectionBoundary name="Bible.ChapterContent" skeleton={<BibleSkeleton />}>
           {showBibleSkeleton ? (
             <BibleSkeleton />
           ) : (
-            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-              {verses
-                .filter((v) => {
-                  if (viewMode === "am") {
-                    return v.verse === v.am_merge_head && v.text_am !== "";
-                  }
-                  return true;
-                })
-                .map((v, vi) => {
-                  const isSelected = studyVerseNum === v.verse;
-                  const highlightColor = highlights[v.verse];
-                  const isBookmarked = bookmarks.has(v.verse);
+            <View>
+              {/* Chapter opening — the one ornamental moment. A manuscript
+                  marks a new chapter; so does this, with the numeral in gold
+                  between two rules. */}
+              <View style={styles.incipit} accessibilityRole="header">
+                <Text style={[styles.incipitBook, { color: c.textSoft }, isAm && { fontFamily: fonts.am }]}>
+                  {currentBook ? bookName(currentBook) : ""}
+                </Text>
+                <View style={styles.incipitRow}>
+                  <View style={[styles.rule, { backgroundColor: c.accentDim }]} />
+                  <Text style={[styles.incipitNum, { color: c.accent, fontFamily: isAm ? fonts.amBold : fonts.serif }]}>
+                    {numeral(currentChapter)}
+                  </Text>
+                  <View style={[styles.rule, { backgroundColor: c.accentDim }]} />
+                </View>
+              </View>
 
-                  return (
-                    <TouchableOpacity
-                      key={v.verse}
-                      ref={vi === 0 ? firstVerseRef : undefined}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setStudyVerseNum(v.verse);
-                        setStudyPanel("actions");
-                      }}
-                      style={[
-                        styles.verseItem,
-                        isSelected && { backgroundColor: c.surfaceAlt, borderColor: c.accent },
-                        !!highlightColor && { backgroundColor: highlightColor },
-                      ]}
-                    >
-                      {/* Verse Number & Icons */}
-                      <View style={styles.vnumRow}>
-                        <ThemedText
-                          type="smallBold"
-                          colorType={isSelected ? "accent" : "textFaint"}
-                          isAmharic={true}
-                        >
-                          {toGeezNumeral(v.verse)}
-                        </ThemedText>
-                        {isBookmarked && (
-                          <View style={{ marginLeft: 4 }}>
-                            <Icon name="bookmark" size={12} color={c.accent} />
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Text Columns */}
-                      {(viewMode === "am" || viewMode === "both") && (
-                        <ThemedText
-                          type="verse"
-                          colorType="text"
-                          isAmharic={true}
-                          style={styles.amText}
-                        >
-                          {v.text_am}
-                        </ThemedText>
-                      )}
-
-                      {(viewMode === "en" || viewMode === "both") && (
-                        <ThemedText
-                          type="verse"
-                          colorType={viewMode === "both" ? "textSoft" : "text"}
-                          isAmharic={false}
-                          style={[styles.enText, viewMode === "both" && { fontStyle: "italic", fontSize: 14 }]}
-                        >
-                          {v.text_en}
-                        </ThemedText>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+              <View ref={firstVerseRef} collapsable={false}>
+                {viewMode === "both" ? (
+                  shownVerses.map((v) => (
+                    <View key={v.verse} style={styles.pair}>
+                      {v.text_am !== "" && v.verse === v.am_merge_head ? (
+                        <Text>{verseSpan(v, v.text_am, amStyle)}</Text>
+                      ) : null}
+                      <Text
+                        onPress={() => openVerse(v.verse)}
+                        suppressHighlighting
+                        style={[enStyle, styles.pairEn, { color: c.textSoft }]}
+                      >
+                        {v.text_am === "" || v.verse !== v.am_merge_head ? (
+                          <Text style={numStyle}>{v.verse} </Text>
+                        ) : null}
+                        {kjv(v.text_en)}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={viewMode === "am" ? amStyle : enStyle}>
+                    {shownVerses.map((v) =>
+                      verseSpan(v, viewMode === "am" ? v.text_am : v.text_en, viewMode === "am" ? amStyle : enStyle),
+                    )}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         </SectionBoundary>
 
-        {/* Bottom Prev/Next Controls */}
+        {/* End of chapter: where the two buttons go, by name. */}
         <SectionBoundary name="Bible.Navigation">
-          <View style={styles.navRow}>
-            <TouchableOpacity
-              onPress={prevChapter}
-              style={[styles.navBtn, { borderColor: c.border, backgroundColor: c.surface }]}
-            >
-              <View style={{ transform: [{ rotate: '180deg' }] }}>
-                <Icon name="chev" size={14} color={c.textSoft} />
-              </View>
-              <ThemedText type="smallBold" colorType="text" style={{ marginLeft: 6 }}>
-                {isAm ? "ቀዳሚ ምዕራፍ" : "Prev Chapter"}
-              </ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={nextChapter}
-              style={[styles.navBtn, { borderColor: c.border, backgroundColor: c.surface }]}
-            >
-              <ThemedText type="smallBold" colorType="text" style={{ marginRight: 6 }}>
-                {isAm ? "ቀጣይ ምዕራፍ" : "Next Chapter"}
-              </ThemedText>
-              <Icon name="chev" size={14} color={c.textSoft} />
-            </TouchableOpacity>
+          <View style={[styles.navRow, { borderTopColor: c.border }]}>
+            {prevTarget ? (
+              <Pressable
+                onPress={prevChapter}
+                style={[styles.navBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t(lang, "a11yPrevChapter")}: ${bookName(prevTarget.book)} ${numeral(prevTarget.chapter)}`}
+                android_ripple={{ color: c.border }}
+              >
+                <Icon name="back" size={16} color={c.textSoft} />
+                <Text style={[styles.navTxt, { color: c.text }]} numberOfLines={1}>
+                  {bookName(prevTarget.book)} {numeral(prevTarget.chapter)}
+                </Text>
+              </Pressable>
+            ) : <View style={{ flex: 1 }} />}
+            {nextTarget ? (
+              <Pressable
+                onPress={nextChapter}
+                style={[styles.navBtn, styles.navBtnNext, { backgroundColor: c.surface, borderColor: c.border }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t(lang, "a11yNextChapter")}: ${bookName(nextTarget.book)} ${numeral(nextTarget.chapter)}`}
+                android_ripple={{ color: c.border }}
+              >
+                <Text style={[styles.navTxt, { color: c.text }]} numberOfLines={1}>
+                  {bookName(nextTarget.book)} {numeral(nextTarget.chapter)}
+                </Text>
+                <Icon name="chev" size={16} color={c.textSoft} />
+              </Pressable>
+            ) : <View style={{ flex: 1 }} />}
           </View>
         </SectionBoundary>
       </ScrollView>
 
-      {/* Language. The same three choices the segmented control offered, moved
-          behind the globe icon so the names are not permanently on screen. */}
-      <Modal visible={langOpen} animationType="fade" transparent onRequestClose={() => setLangOpen(false)}>
-        <TouchableOpacity style={styles.langBackdrop} activeOpacity={1} onPress={() => setLangOpen(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={[styles.langSheet, { backgroundColor: c.surface, borderColor: c.borderLit }]}>
-              <ThemedText type="smallBold" colorType="textFaint" style={styles.langHeading}>
-                {isAm ? "ቋንቋ" : "Language"}
-              </ThemedText>
-              {[
-                { k: "am", l: "አማርኛ", amharic: true },
-                { k: "en", l: "English", amharic: false },
-                { k: "both", l: isAm ? "ሁለቱም" : "Both", amharic: isAm },
-              ].map((o) => (
-                <TouchableOpacity
-                  key={o.k}
-                  onPress={() => {
-                    setViewMode(o.k as any);
-                    setLangOpen(false);
-                  }}
-                  style={[styles.langRow, { borderColor: c.border }]}
-                  accessibilityRole="button"
-                >
-                  <ThemedText
-                    type="default"
-                    isAmharic={o.amharic}
-                    style={{ color: viewMode === o.k ? c.accent : c.text, flex: 1 }}
-                  >
-                    {o.l}
-                  </ThemedText>
-                  {viewMode === o.k ? <Icon name="check" size={16} color={c.accent} /> : null}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Book & Chapter Selector Modal */}
-      <Modal visible={selectorOpen} animationType="slide" transparent={false}>
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: c.bg }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
-            <ThemedText type="subtitle" colorType="text">
-              {isAm ? "መጽሐፍ ይምረጡ" : "Select Book"}
-            </ThemedText>
-            <TouchableOpacity onPress={() => setSelectorOpen(false)} style={styles.actionBtn}>
-              <Icon name="check" size={20} color={c.accent} />
-            </TouchableOpacity>
+      {/* Reading options — a bottom sheet, the way reading apps put "Aa":
+          language, text size, and light or dark, all in one reach. */}
+      <Modal visible={langOpen} animationType="slide" transparent onRequestClose={() => setLangOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setLangOpen(false)} accessibilityLabel={t(lang, "close")} />
+        <View style={[styles.sheet, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={[styles.grabber, { backgroundColor: c.borderLit }]} />
+          <View style={styles.sheetHead}>
+            <Text style={[styles.sheetTitle, { color: c.text }]}>{t(lang, "readingOptions")}</Text>
+            <Pressable onPress={() => setLangOpen(false)} style={styles.textBtn} accessibilityRole="button">
+              <Text style={[styles.textBtnTxt, { color: c.accent }]}>{t(lang, "done")}</Text>
+            </Pressable>
           </View>
 
-          <View style={[styles.testamentSelector, { borderBottomColor: c.border }]}>
-            <TouchableOpacity
-              onPress={() => {
-                setActiveTestament("OT");
-                setExpandedBookId(null);
-              }}
-              style={[
-                styles.testamentTab,
-                activeTestament === "OT" && { borderBottomColor: c.accent, borderBottomWidth: 2 }
-              ]}
-            >
-              <ThemedText
-                type="smallBold"
-                style={{
-                  color: activeTestament === "OT" ? c.accent : c.textSoft,
-                  fontSize: 13,
-                  paddingVertical: 10,
-                }}
-              >
-                {isAm ? "ብሉይ ኪዳን" : "Old Testament"}
-              </ThemedText>
-            </TouchableOpacity>
+          <Text style={[styles.sheetLabel, { color: c.textSoft }]}>{t(lang, "readingLanguageLabel")}</Text>
+          <Segmented
+            c={c}
+            value={viewMode}
+            onChange={(v) => setViewMode(v as any)}
+            options={[
+              { value: "am", label: "አማርኛ" },
+              { value: "en", label: "English" },
+              { value: "both", label: t(lang, "readingBoth") },
+            ]}
+          />
 
-            <TouchableOpacity
-              onPress={() => {
-                setActiveTestament("NT");
+          <Text style={[styles.sheetLabel, { color: c.textSoft }]}>{t(lang, "textSize")}</Text>
+          <Segmented
+            c={c}
+            value={readerSize}
+            onChange={(v) => setReaderSize(v as ReaderSize)}
+            options={sizeOptions.map((sz) => ({
+              value: sz,
+              label: "ሀ",
+              labelStyle: { fontFamily: fonts.am, fontSize: Math.round(15 * readerScale[sz]) },
+              a11y: `${t(lang, "textSize")} ${sizeOptions.indexOf(sz) + 1}`,
+            }))}
+          />
+
+          <Text style={[styles.sheetLabel, { color: c.textSoft }]}>{t(lang, "themeLabel")}</Text>
+          <Segmented
+            c={c}
+            value={themeMode}
+            onChange={(v) => setThemeMode(v as ThemeMode)}
+            options={themeOptions}
+          />
+        </View>
+      </Modal>
+
+      {/* Book & chapter picker */}
+      <Modal visible={selectorOpen} animationType="slide" onRequestClose={() => setSelectorOpen(false)}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: c.bg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
+            <Text style={[styles.sheetTitle, { color: c.text }]}>{t(lang, "selectBook")}</Text>
+            <Pressable onPress={() => setSelectorOpen(false)} style={styles.textBtn} accessibilityRole="button">
+              <Text style={[styles.textBtnTxt, { color: c.accent }]}>{t(lang, "close")}</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.modalBody}>
+            <Segmented
+              c={c}
+              value={activeTestament}
+              onChange={(v) => {
+                setActiveTestament(v as "OT" | "NT");
                 setExpandedBookId(null);
               }}
-              style={[
-                styles.testamentTab,
-                activeTestament === "NT" && { borderBottomColor: c.accent, borderBottomWidth: 2 }
+              options={[
+                { value: "OT", label: t(lang, "oldTestament") },
+                { value: "NT", label: t(lang, "newTestament") },
               ]}
-            >
-              <ThemedText
-                type="smallBold"
-                style={{
-                  color: activeTestament === "NT" ? c.accent : c.textSoft,
-                  fontSize: 13,
-                  paddingVertical: 10,
-                }}
-              >
-                {isAm ? "አዲስ ኪዳን" : "New Testament"}
-              </ThemedText>
-            </TouchableOpacity>
+            />
           </View>
 
           <FlatList
-            data={books.filter(b => b.testament === activeTestament)}
+            data={books.filter((b) => b.testament === activeTestament)}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.bookList}
             renderItem={({ item }) => {
               const isExpanded = expandedBookId === item.id;
+              const isCurrent = currentBook?.id === item.id;
               return (
                 <View style={[styles.bookItem, { borderBottomColor: c.border }]}>
-                  <TouchableOpacity
+                  <Pressable
                     onPress={() => setExpandedBookId(isExpanded ? null : item.id)}
                     style={styles.bookItemHeader}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: isExpanded }}
+                    android_ripple={{ color: c.border }}
                   >
-                    <ThemedText type="subtitle" colorType="text">
-                      {isAm ? item.name_am : item.name_en}
-                    </ThemedText>
-                    <Icon name={isExpanded ? "down" : "chev"} size={14} color={c.textSoft} />
-                  </TouchableOpacity>
+                    <Text style={[styles.bookName, { color: isCurrent ? c.accent : c.text }]}>
+                      {bookName(item)}
+                    </Text>
+                    <Text style={[styles.bookCount, { color: c.textSoft }]}>{numeral(item.chapters)}</Text>
+                    <Icon name={isExpanded ? "chevDown" : "chev"} size={16} color={c.textSoft} />
+                  </Pressable>
 
                   {isExpanded && (
                     <View style={styles.chaptersGrid}>
-                      {Array.from({ length: item.chapters }, (_, i) => i + 1).map((ch) => (
-                        <TouchableOpacity
-                          key={ch}
-                          onPress={() => {
-                            setCurrentBook(item);
-                            setCurrentChapter(ch);
-                            setSelectorOpen(false);
-                            setExpandedBookId(null);
-                          }}
-                          style={[
-                            styles.chapterCell,
-                            { borderColor: c.border, backgroundColor: c.surface },
-                            currentBook?.id === item.id && currentChapter === ch
-                              ? { backgroundColor: c.accent, borderColor: c.accent }
-                              : null,
-                          ]}
-                        >
-                          <ThemedText
-                            type="smallBold"
-                            style={{
-                              color:
-                                currentBook?.id === item.id && currentChapter === ch
-                                  ? c.bg
-                                  : c.text,
+                      {Array.from({ length: item.chapters }, (_, i) => i + 1).map((ch) => {
+                        const here = isCurrent && currentChapter === ch;
+                        return (
+                          <Pressable
+                            key={ch}
+                            onPress={() => {
+                              setCurrentBook(item);
+                              setCurrentChapter(ch);
+                              setSelectorOpen(false);
+                              setExpandedBookId(null);
                             }}
+                            style={[
+                              styles.chapterCell,
+                              { backgroundColor: here ? c.accent : c.surface, borderColor: here ? c.accent : c.border },
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: here }}
                           >
-                            {ch}
-                          </ThemedText>
-                        </TouchableOpacity>
-                      ))}
+                            <Text style={[styles.chapterTxt, { color: here ? c.onAccent : c.text }]}>
+                              {numeral(ch)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
@@ -755,72 +865,81 @@ export default function BibleScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Search Modal */}
-      <Modal visible={searchOpen} animationType="fade" transparent={false}>
+      {/* Search */}
+      <Modal
+        visible={searchOpen}
+        animationType="fade"
+        onRequestClose={() => {
+          setSearchOpen(false);
+          setSearchQuery("");
+          setSearchResults([]);
+        }}
+      >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: c.bg }]}>
           <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
             <View style={[styles.searchBarContainer, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <Icon name="search" size={16} color={c.textFaint} />
+              <Icon name="search" size={18} color={c.textSoft} />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder={isAm ? "ቃል ይፈልጉ..." : "Search verses..."}
+                placeholder={t(lang, "searchPlaceholder")}
                 placeholderTextColor={c.textFaint}
-                autoFocus={true}
+                autoFocus
+                returnKeyType="search"
+                accessibilityLabel={t(lang, "a11ySearch")}
                 style={[styles.searchInput, { color: c.text }]}
               />
             </View>
-            <TouchableOpacity
+            <Pressable
               onPress={() => {
                 setSearchOpen(false);
                 setSearchQuery("");
                 setSearchResults([]);
               }}
-              style={styles.closeSearchBtn}
+              style={styles.textBtn}
+              accessibilityRole="button"
             >
-              <ThemedText type="smallBold" colorType="accent">
-                {isAm ? "ዝጋ" : "Close"}
-              </ThemedText>
-            </TouchableOpacity>
+              <Text style={[styles.textBtnTxt, { color: c.accent }]}>{t(lang, "close")}</Text>
+            </Pressable>
           </View>
 
           <SectionBoundary name="Bible.Search">
             {searchResults.length > 0 ? (
               <FlatList
                 data={searchResults}
+                keyboardShouldPersistTaps="handled"
                 keyExtractor={(item, idx) => `${item.book}-${item.chapter}-${item.verse}-${idx}`}
                 contentContainerStyle={styles.searchResultsContainer}
                 renderItem={({ item }) => (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={() => handleSelectSearchResult(item)}
                     style={[styles.searchResultItem, { borderBottomColor: c.border }]}
+                    accessibilityRole="button"
+                    android_ripple={{ color: c.border }}
                   >
-                    <ThemedText type="smallBold" colorType="accent" style={{ marginBottom: 4 }}>
-                      {isAm ? item.name_am : item.name_en} {item.chapter}:{item.verse}
-                    </ThemedText>
-                    <ThemedText type="small" colorType="text" style={{ lineHeight: 18 }}>
-                      {item.text_am}
-                    </ThemedText>
-                    <ThemedText type="small" colorType="textSoft" style={{ fontStyle: "italic", marginTop: 2 }}>
-                      {item.text_en}
-                    </ThemedText>
-                  </TouchableOpacity>
+                    <Text style={[styles.resultRef, { color: c.accent }]}>
+                      {isAm ? item.name_am : item.name_en} {numeral(item.chapter)}{isAm ? "፥" : ":"}{numeral(item.verse)}
+                    </Text>
+                    {item.text_am ? (
+                      <Text style={[styles.resultAm, { color: c.text }]}>{item.text_am}</Text>
+                    ) : null}
+                    {item.text_en ? (
+                      <Text style={[styles.resultEn, { color: c.textSoft }]}>{item.text_en}</Text>
+                    ) : null}
+                  </Pressable>
                 )}
               />
             ) : (
               <View style={styles.searchEmptyContainer}>
-                <Icon name="search" size={32} color={c.border} />
-                <ThemedText type="default" colorType="textFaint" style={{ marginTop: 10 }}>
-                  {searchQuery.trim()
-                    ? (isAm ? "ምንም ውጤት አልተገኘም" : "No results found")
-                    : (isAm ? "አማርኛ ወይም እንግሊዝኛ ቃላትን ያስገቡ" : "Search in Amharic or English")}
-                </ThemedText>
+                <Icon name="search" size={32} color={c.textFaint} />
+                <Text style={[styles.emptyTxt, { color: c.textSoft }]}>
+                  {searchQuery.trim() ? t(lang, "noResults") : t(lang, "searchHint")}
+                </Text>
               </View>
             )}
           </SectionBoundary>
         </SafeAreaView>
       </Modal>
-
 
       <VerseStudySheets
         verseRef={studyVerseRef}
@@ -840,107 +959,189 @@ export default function BibleScreen() {
       />
 
       <CoachMarks c={c} lang={lang} steps={coachSteps} visible={tourVisible} onDone={finishTour} />
+
+      <AudioPlayerOverlay
+        visible={audioPlayerVisible}
+        onClose={() => setAudioPlayerVisible(false)}
+        onLoadChapter={handleLoadAudioChapter}
+        currentBook={currentBook?.id ?? null}
+        currentChapter={currentChapter}
+        books={books}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * A segmented control — two to four mutually exclusive choices in one row,
+ * the selected one filled. Familiar on both platforms; each segment is a full
+ * 48-dp target and announces itself as a radio choice.
+ */
+function Segmented({
+  c,
+  value,
+  options,
+  onChange,
+}: {
+  c: ReturnType<typeof useApp>["c"];
+  value: string;
+  options: { value: string; label: string; labelStyle?: object; a11y?: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <View style={[styles.segment, { backgroundColor: c.surfaceAlt }]} accessibilityRole="radiogroup">
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <Pressable
+            key={o.value}
+            onPress={() => onChange(o.value)}
+            style={[styles.segmentItem, on && { backgroundColor: c.bg, borderColor: c.borderLit, borderWidth: StyleSheet.hairlineWidth }]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={o.a11y}
+          >
+            <Text style={[styles.segmentTxt, { color: on ? c.text : c.textSoft }, on && styles.segmentTxtOn, o.labelStyle]}>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   outer: { flex: 1 },
+
+  // Toolbar
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+    paddingLeft: space.sm,
+    paddingRight: space.xs,
+    minHeight: 56,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerRef: { flex: 1, marginRight: 12 },
-  langBackdrop: {
+  headerRef: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  langSheet: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 18, paddingVertical: 10 },
-  langHeading: { paddingVertical: 10 },
-  langRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    gap: 6,
+    minHeight: TARGET,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700", flexShrink: 1 },
+  headerTitleAm: { fontFamily: fonts.amBold, fontWeight: undefined },
+  toolBtn: { width: TARGET, height: TARGET, alignItems: "center", justifyContent: "center" },
+
+  // Page
+  page: { paddingHorizontal: space.xl - 2, paddingTop: space.lg, paddingBottom: 120 },
+  incipit: { alignItems: "center", marginBottom: space.xl, marginTop: space.sm },
+  incipitBook: { fontSize: 15, letterSpacing: 0.3 },
+  incipitRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: 2 },
+  rule: { width: 40, height: StyleSheet.hairlineWidth * 2 },
+  incipitNum: { fontSize: 44, lineHeight: 60 },
+  pair: { marginBottom: space.lg },
+  pairEn: { marginTop: 2 },
+
+  // End of chapter
+  navRow: {
+    flexDirection: "row",
+    gap: space.md,
+    marginTop: space.xxl,
+    paddingTop: space.xl,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  iconbtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  navIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  versesContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
-  card: { borderRadius: radius.lg, borderWidth: 1, padding: 12 },
-  verseItem: { padding: 10, borderRadius: radius.md, width: '100%', marginBottom: 4 },
-  vnumRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  vnum: { fontSize: 11, fontWeight: '700' },
-  amText: { fontSize: 17, lineHeight: 34 },
-  enText: { fontSize: 15.5, lineHeight: 24 },
-  navRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, gap: 10 },
   navBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: 52,
+    paddingHorizontal: space.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
   },
+  navBtnNext: { justifyContent: "flex-end" },
+  navTxt: { fontSize: 15, fontWeight: "600", flexShrink: 1 },
+
+  // Reading options sheet
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
+  sheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xxl,
+  },
+  grabber: { alignSelf: "center", width: 36, height: 5, borderRadius: 3, marginTop: space.sm },
+  sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: TARGET + 4 },
+  sheetTitle: { fontSize: 18, fontWeight: "700" },
+  sheetLabel: { fontSize: 13, fontWeight: "600", marginTop: space.lg, marginBottom: space.sm },
+  textBtn: { minHeight: TARGET, minWidth: TARGET, alignItems: "center", justifyContent: "center", paddingHorizontal: space.sm },
+  textBtnTxt: { fontSize: 16, fontWeight: "600" },
+
+  segment: { flexDirection: "row", borderRadius: radius.md, padding: 3, gap: 3 },
+  segmentItem: {
+    flex: 1,
+    minHeight: TARGET - 4,
+    borderRadius: radius.sm + 2,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  segmentTxt: { fontSize: 15 },
+  segmentTxtOn: { fontWeight: "600" },
+
+  // Picker
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    paddingLeft: space.lg,
+    paddingRight: space.sm,
+    minHeight: 56,
+    gap: space.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  testamentSelector: { flexDirection: "row", borderBottomWidth: 1 },
-  testamentTab: { flex: 1, alignItems: "center" },
-  bookList: { paddingHorizontal: 16, paddingBottom: 30 },
-  bookItem: { borderBottomWidth: 1, paddingVertical: 14 },
-  bookItemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  chaptersGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  modalBody: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm },
+  bookList: { paddingHorizontal: space.lg, paddingBottom: space.xxl },
+  bookItem: { borderBottomWidth: StyleSheet.hairlineWidth },
+  bookItemHeader: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 54 },
+  bookName: { flex: 1, fontSize: 17 },
+  bookCount: { fontSize: 13 },
+  chaptersGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: space.lg },
   chapterCell: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    width: TARGET,
+    height: TARGET,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
+  chapterTxt: { fontSize: 15, fontWeight: "600" },
+
+  // Search
   searchBarContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    marginRight: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.md,
+    minHeight: 44,
   },
-  searchInput: { flex: 1, fontSize: 15, paddingVertical: 8, marginLeft: 8 },
-  closeSearchBtn: { justifyContent: "center" },
-  searchResultsContainer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
-  searchResultItem: { paddingVertical: 12, borderBottomWidth: 1 },
-  searchEmptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  actionBtn: { padding: 6 },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 8, marginLeft: 8 },
+  searchResultsContainer: { paddingHorizontal: space.lg, paddingBottom: space.xxl },
+  searchResultItem: { paddingVertical: space.md, borderBottomWidth: StyleSheet.hairlineWidth },
+  resultRef: { fontSize: 13, fontWeight: "700", marginBottom: 4 },
+  resultAm: { fontFamily: fonts.am, fontSize: 16, lineHeight: 28 },
+  resultEn: { fontFamily: fonts.serif, fontSize: 14, lineHeight: 20, marginTop: 2 },
+  searchEmptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: space.md, padding: space.xl },
+  emptyTxt: { fontSize: 15, textAlign: "center" },
 });

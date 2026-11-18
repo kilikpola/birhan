@@ -1,11 +1,12 @@
 import React from 'react';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 
 export type IconName =
   | 'book' | 'note' | 'menu' | 'search' | 'play' | 'pause' | 'prev' | 'next'
   | 'down' | 'check' | 'wifiOff' | 'chevron' | 'chev' | 'back' | 'sun' | 'moon' | 'church'
   | 'globe' | 'user' | 'bookmark' | 'share' | 'reply' | 'lock' | 'send'
-  | 'gear' | 'plus' | 'eyeOff' | 'eye' | 'link' | 'quote' | 'tag' | 'copy' | 'alert';
+  | 'gear' | 'plus' | 'eyeOff' | 'eye' | 'link' | 'quote' | 'tag' | 'copy' | 'alert'
+  | 'textSize' | 'close' | 'chevDown' | 'loading' | 'rewind10' | 'forward10' | 'volume' | 'volumeUp' | 'storage' | 'trash' | 'wifi' | 'wifiOff';
 
 export interface IconProps {
   name: IconName;
@@ -219,12 +220,83 @@ export const Icon: React.FC<IconProps> = ({ name, size = 20, color = 'currentCol
           <Path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
         </Svg>
       );
-    case 'alert':
+    case 'textSize':
+      // "Aa": a large A and a small one, sharing a baseline.
       return (
         <Svg {...commonProps}>
-          <Circle cx="12" cy="12" r="9" />
-          <Path d="M12 8v5" />
-          <Circle cx="12" cy="16" r="0.5" fill={color} />
+          <Path d="M3 19l5.5-14L14 19" />
+          <Path d="M5.2 13.5h6.6" />
+          <Path d="M15 19l3.5-8.5L22 19" />
+          <Path d="M16.3 16h4.4" />
+        </Svg>
+      );
+    case 'chevDown':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M6 9l6 6 6-6" />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M6 6l12 12M18 6L6 18" />
+        </Svg>
+      );
+    case 'loading':
+      return (
+        <Svg {...commonProps}>
+          <Circle cx="12" cy="12" r="8" strokeDasharray="32 32" strokeDashoffset="0" fill="none" strokeWidth={2.5} />
+        </Svg>
+      );
+    case 'rewind10':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M11 18V6l-8.5 6 8.5 6z" />
+          <Path d="M13 18V6l-8.5 6 8.5 6z" />
+        </Svg>
+      );
+    case 'forward10':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M13 6v12l8.5-6-8.5-6z" />
+          <Path d="M11 6v12l8.5-6-8.5-6z" />
+        </Svg>
+      );
+    case 'volume':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M5 9v6h3l4 4V5L8 9H5z" />
+        </Svg>
+      );
+    case 'volumeUp':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M5 9v6h3l4 4V5L8 9H5z" />
+          <Path d="M14 6.5a3 3 0 010 11" />
+          <Path d="M17 4.5a6 6 0 010 15" />
+        </Svg>
+      );
+    case 'storage':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M21 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v3" />
+          <Path d="M21 16V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2h14a2 2 0 002-2z" />
+          <Path d="M4 16v6M20 16v6" />
+        </Svg>
+      );
+    case 'trash':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M4 7h16M10 11v6M14 11v6M19 7H6l-1 15h14L19 7z" />
+        </Svg>
+      );
+    case 'wifi':
+      return (
+        <Svg {...commonProps}>
+          <Path d="M5 12.55a11 11 0 0114.08 0" />
+          <Path d="M1.42 9a16 16 0 0121.16 0" />
+          <Path d="M8.53 16.11a6 6 0 016.94 0" />
+          <Line x1="12" y1="20" x2="12.01" y2="20" />
         </Svg>
       );
     case 'eye':
